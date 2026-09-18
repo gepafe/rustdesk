@@ -31,7 +31,14 @@ class ServerModel with ChangeNotifier {
   bool _fileOk = false;
   bool _clipboardOk = false;
   bool _showElevation = false;
-  bool hideCm = false;
+  bool _hideCm = true;
+  bool get hideCm => _hideCm;
+  set hideCm(bool value) {
+    if (_hideCm != value) {
+      _hideCm = value;
+      notifyListeners();
+    }
+  }
   int _connectStatus = 0; // Rendezvous Server status
   String _verificationMethod = "";
   String _temporaryPasswordLength = "";
