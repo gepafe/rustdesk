@@ -424,6 +424,7 @@ class _AddressBookState extends State<AddressBook> {
     final canWrite = gFFI.abModel.current.canWrite();
     final items = [
       if (canWrite) getEntry(translate("Add ID"), addIdToCurrentAb),
+      if (canWrite) getEntry(translate("Importar equipos"), importPeersBulkAb),
       if (canWrite) getEntry(translate("Add Tag"), abAddTag),
       getEntry(translate("Unselect all tags"), gFFI.abModel.unsetSelectedTags),
       if (gFFI.abModel.legacyMode.value)
@@ -664,6 +665,95 @@ class _AddressBookState extends State<AddressBook> {
                 )
               ]).marginSymmetric(vertical: 10),
             // NOT use Offstage to wrap LinearProgressIndicator
+            if (isInProgress) const LinearProgressIndicator(),
+          ],
+        ),
+        actions: [
+          dialogButton("Cancel", onPressed: close, isOutline: true),
+          dialogButton("OK", onPressed: submit),
+        ],
+        onSubmit: submit,
+        onCancel: close,
+      );
+    });
+  }
+
+  void importPeersBulkAb() async {
+    var isInProgress = false;
+    var msg = "";
+    final controller = TextEditingController();
+    gFFI.dialogManager.show((setState, close, context) {
+      submit() async {
+        setState(() {
+          isInProgress = true;
+          msg = "";
+        });
+        final lines = controller.text
+            .split(RegExp(r"[\r\n]+"))
+            .map((l) => l.trim())
+            .where((l) => l.isNotEmpty)
+            .toList();
+        var ok = 0;
+        var skipped = 0;
+        for (final line in lines) {
+          final parts =
+              line.split(RegExp(r"[/;,|]+")).map((p) => p.trim()).toList();
+          if (parts.isEmpty || parts[0].isEmpty) {
+            continue;
+          }
+          final id = parts[0];
+          final alias = parts.length > 1 ? parts[1] : "";
+          final group = parts.length > 2 ? parts[2] : "";
+          if (gFFI.abModel.idContainByCurrent(id)) {
+            skipped++;
+            continue;
+          }
+          final errMsg = await gFFI.abModel.addIdToCurrent(
+              id, alias, "", List<dynamic>.of([group]), "");
+          if (errMsg != null) {
+            skipped++;
+          } else {
+            ok++;
+          }
+        }
+        setState(() {
+          isInProgress = false;
+          msg = "${translate("Importados")}: $ok, "
+              "${translate("omitidos")}: $skipped";
+        });
+        if (lines.isEmpty) {
+          setState(() {
+            msg = translate("No se encontraron equipos en el texto.");
+          });
+        }
+      }
+
+      return CustomAlertDialog(
+        title: Text(translate("Importar equipos")),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              translate(
+                  "Pega los equipos, uno por línea. Formato: ID;Nombre;Grupo"),
+              style: TextStyle(fontSize: 13),
+            ).marginOnly(bottom: 8),
+            TextField(
+              controller: controller,
+              maxLines: 12,
+              minLines: 6,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: translate("Ejemplo: 123456789;PC de Maria;Oficina"),
+                border: OutlineInputBorder(),
+              ),
+            ).workaroundFreezeLinuxMint(),
+            if (msg.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(msg, style: TextStyle(color: Colors.green)),
+              ),
             if (isInProgress) const LinearProgressIndicator(),
           ],
         ),
