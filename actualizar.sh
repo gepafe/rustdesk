@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-# actualizar.sh - CLIENTE VITALFIX EN UN SOLO PASO
+# actualizar.sh - CLIENTE RUSTDESK PERSONALIZADO EN UN SOLO PASO
 # -----------------------------------------------------------------------------
 # Cuando RustDesk oficial saque una versión nueva, ejecuta:
 #     ./actualizar.sh
 # y este script hace TODO automáticamente:
 #   1. Baja la última versión del repositorio oficial (upstream).
-#   2. Le aplica las personalizaciones VITALFIX (CM oculta, sin actualizaciones,
-#      marca VITALFIX).
+#   2. Le aplica las personalizaciones (CM oculta y sin actualizaciones
+#      automáticas). Se mantiene el nombre y logo originales de RustDesk.
 #   3. Compila en GitHub Actions (gratis, en la nube).
 #   4. Espera a que termine.
 #   5. Descarga el .exe de Windows a tu PC.
@@ -63,16 +63,14 @@ git fetch upstream --tags --prune || die "Fallo al descargar upstream (revisa co
 git reset --hard upstream/"${BRANCH}" || die "Fallo al sincronizar con upstream."
 
 # -----------------------------------------------------------------------------
-# 2. Aplicar las personalizaciones VITALFIX (idempotente: solo si faltan)
+# 2. Aplicar las personalizaciones (idempotente: solo si faltan)
 # -----------------------------------------------------------------------------
-say "Aplicando personalizaciones VITALFIX..."
+say "Aplicando personalizaciones..."
 
 F_MODELS="flutter/lib/models/server_model.dart"
 F_MAIN="flutter/lib/main.dart"
 F_SETTING="flutter/lib/desktop/pages/desktop_setting_page.dart"
 F_UPDATER="src/updater.rs"
-F_COMMON="src/common.rs"
-F_CARGO="Cargo.toml"
 
 # --- 2.1 server_model.dart: hideCm = true por defecto ---
 if grep -q 'bool hideCm = false;' "$F_MODELS"; then
@@ -100,27 +98,10 @@ fi
 
 # --- 2.4 updater.rs: desactivar actualizaciones automáticas ---
 if grep -q 'if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE))' "$F_UPDATER"; then
-  perl -0pi -e 's/if !\(manually \|\| config::Config::get_bool_option\(keys::OPTION_ALLOW_AUTO_UPDATE\)\) \{/\/\/ Cliente personalizado VITALFIX: deshabilitar las actualizaciones automáticas.\n    if !manually {\n        return Ok(());\n    }\n    if !config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE) {/' "$F_UPDATER"
+  perl -0pi -e 's/if !\(manually \|\| config::Config::get_bool_option\(keys::OPTION_ALLOW_AUTO_UPDATE\)\) \{/\/\/ Cliente personalizado: deshabilitar las actualizaciones automáticas.\n    if !manually {\n        return Ok(());\n    }\n    if !config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE) {/' "$F_UPDATER"
   grep -q 'if !manually {' "$F_UPDATER" && say "  updater.rs: actualizaciones automáticas desactivadas." || warn "  updater.rs: no se pudo parchear."
 else
-  grep -q 'Cliente personalizado VITALFIX: deshabilitar' "$F_UPDATER" && say "  updater.rs: ya desactivado." || warn "  updater.rs: patrón inesperado, revísalo."
-fi
-
-# --- 2.5 common.rs: nombre de la app = VITALFIX ---
-if grep -q 'format!(\"{}\", get_custom_client_name())' "$F_COMMON" || grep -q 'get_custom_client_name' "$F_COMMON"; then
-  # Caso genérico: reemplaza la llamada que devuelve el nombre por "VITALFIX".
-  perl -0pi -e 's/fn get_app_name\(\) -> String \{[^{]*\{.*?\n    \}\n/fn get_app_name() -> String {\n    \/\/ Cliente personalizado VITALFIX: nombre de la aplicación fijo.\n    "VITALFIX".to_owned()\n}\n/s' "$F_COMMON"
-  grep -q 'Cliente personalizado VITALFIX: nombre de la aplicación fijo' "$F_COMMON" && say "  common.rs: nombre de la app = VITALFIX." || warn "  common.rs: no se pudo reescribir get_app_name, revísalo."
-else
-  grep -q 'Cliente personalizado VITALFIX: nombre de la aplicación fijo' "$F_COMMON" && say "  common.rs: ya modificado." || warn "  common.rs: patrón inesperado, revísalo."
-fi
-
-# --- 2.6 Cargo.toml: metadatos VITALFIX ---
-if grep -q 'ProductName = "RustDesk"' "$F_CARGO"; then
-  perl -0pi -e 's/LegalCopyright = "[^"]*"/LegalCopyright = "Copyright © 2026 VITALFIX. Todos los derechos reservados."/; s/ProductName = "RustDesk"/ProductName = "VITALFIX"/; s/FileDescription = "RustDesk Remote Desktop"/FileDescription = "VITALFIX Remote Desktop"/; s/OriginalFilename = "rustdesk\.exe"/OriginalFilename = "vitalfix.exe"/' "$F_CARGO"
-  grep -q 'ProductName = "VITALFIX"' "$F_CARGO" && say "  Cargo.toml: metadatos VITALFIX." || warn "  Cargo.toml: no se pudo parchear."
-else
-  grep -q 'ProductName = "VITALFIX"' "$F_CARGO" && say "  Cargo.toml: ya modificado." || warn "  Cargo.toml: patrón inesperado, revísalo."
+  grep -q 'Cliente personalizado: deshabilitar' "$F_UPDATER" && say "  updater.rs: ya desactivado." || warn "  updater.rs: patrón inesperado, revísalo."
 fi
 
 # -----------------------------------------------------------------------------
@@ -130,11 +111,11 @@ git add -A
 if git diff --cached --quiet; then
   say "Sin cambios de código nuevos (ya estaba personalizado)."
 else
-  git commit -m "feat: personalizar cliente con marca VITALFIX y desactivar actualizaciones automáticas" >/dev/null
+  git commit -m "feat: personalizar cliente (CM oculta y sin actualizaciones automáticas)" >/dev/null
   say "Cambios confirmados."
 fi
 git push "$PUSH_URL" "$BRANCH" >/dev/null 2>&1 || warn "No se pudo subir master (revisa token)."
-git tag -a "$TAG" -m "Cliente VITALFIX" >/dev/null 2>&1 || die "El tag $TAG ya existe. Borra el tag local o cambia TAG."
+git tag -a "$TAG" -m "Cliente personalizado" >/dev/null 2>&1 || die "El tag $TAG ya existe. Borra el tag local o cambia TAG."
 git push "$PUSH_URL" "$TAG" >/dev/null 2>&1 || die "No se pudo subir el tag (revisa token)."
 say "Subido tag $TAG."
 
@@ -163,5 +144,5 @@ gh release download "$TAG" --repo "$FORK" --pattern "*.x86_64.exe" --clobber 2>/
   || die "No se pudo descargar el .exe."
 
 EXE=$(ls -1 ./*.exe 2>/dev/null | grep -i x86_64 | head -1 || ls -1 ./*.exe 2>/dev/null | head -1)
-say "¡LISTO! Tu cliente VITALFIX está en: $DEST/$EXE"
+say "¡LISTO! Tu cliente personalizado está en: $DEST/$EXE"
 say "Distribúyelo a los 20 equipos. Proceso completado."

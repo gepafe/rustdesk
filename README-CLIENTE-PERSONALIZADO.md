@@ -1,8 +1,8 @@
 # Cliente RustDesk Personalizado - Ventana CM Oculta
 
 Cliente personalizado de RustDesk para Windows que oculta la **ventana de Gestión
-de Conexiones (CM)** por defecto, para que nunca aparezca en el equipo remoto al
-prestar soporte.
+de Conexiones (CM)** por defecto y **desactiva las actualizaciones automáticas**,
+manteniendo el nombre y el logo originales de RustDesk.
 
 ## ¿Qué hace este cliente?
 
@@ -20,6 +20,11 @@ Modificaciones aplicadas sobre el código fuente:
 3. **`flutter/lib/desktop/pages/desktop_setting_page.dart`** - se descomenta el
    checkbox "Ocultar ventana de gestión de conexiones" y se bloquea con
    `IgnorePointer` para que no pueda desactivarse desde la interfaz.
+4. **`src/updater.rs`** - las actualizaciones automáticas quedan deshabilitadas de
+   fábrica, para que los clientes no pierdan la personalización al actualizarse.
+
+> El cliente mantiene el **nombre y el logo originales de RustDesk** (no se
+> rebautiza a VITALFIX).
 
 ## Instalación en los equipos del equipo (20 equipos)
 
@@ -57,7 +62,8 @@ Cuando el repositorio oficial publique una nueva versión, ejecuta en tu PC:
 
 El script hace **todo automáticamente**:
 1. Descarga la última versión del repositorio oficial (upstream).
-2. Aplica las personalizaciones VITALFIX (CM oculta, sin actualizaciones, marca).
+2. Aplica las personalizaciones (CM oculta y sin actualizaciones automáticas).
+   Se mantiene el nombre y el logo originales de RustDesk.
 3. Sube los cambios y lanza la compilación en GitHub Actions.
 4. Espera a que termine (40-90 min).
 5. Descarga el `.exe` de Windows x64 a tu PC.
