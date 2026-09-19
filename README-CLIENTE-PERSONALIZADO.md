@@ -47,8 +47,30 @@ equipo (puede ser necesario si los usuarios no tienen acceso a la configuración
 
 ## Regenerar el cliente cuando salga una nueva versión de RustDesk
 
-Cuando el repositorio oficial publique una nueva versión, repite el proceso con el
-script automatizado:
+### Método automático (UN SOLO PASO) — recomendado
+
+Cuando el repositorio oficial publique una nueva versión, ejecuta en tu PC:
+
+```bash
+./actualizar.sh
+```
+
+El script hace **todo automáticamente**:
+1. Descarga la última versión del repositorio oficial (upstream).
+2. Aplica las personalizaciones VITALFIX (CM oculta, sin actualizaciones, marca).
+3. Sube los cambios y lanza la compilación en GitHub Actions.
+4. Espera a que termine (40-90 min).
+5. Descarga el `.exe` de Windows x64 a tu PC.
+
+Solo requiere que `gh` esté autenticado (`gh auth login --web --scopes "repo, workflow"`).
+
+Variables opcionales:
+- `DEST=/ruta` — carpeta donde dejar el .exe (por defecto: la actual).
+- `WORKDIR=otra_carpeta` — dónde está/crea el clone.
+
+### Método semiautomático (script rebuild.sh)
+
+Alternativa paso a paso:
 
 1. Clona tu fork (o usa el existente).
 2. Ejecuta el script de reconstrucción:
@@ -59,7 +81,7 @@ script automatizado:
 
 3. El script:
    - Sincroniza el fork con `upstream` (el repo oficial).
-   - Re-aplica los parches (las 3 modificaciones al código).
+   - Re-aplica los parches (las modificaciones al código).
    - Confirma los cambios y los sube.
    - Crea un tag con marca de tiempo (`vX.Y.Z-custom-<fecha>`).
    - Dispara la compilación automática en GitHub Actions.
