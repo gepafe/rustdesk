@@ -2,6 +2,11 @@ name: Flutter Tag Build
 
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        type: string
+        default: "windows"
+        description: "Plataformas (separadas por coma): windows, android, linux, macos, ios"
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -16,3 +21,4 @@ jobs:
     with:
       upload-artifact: true
       upload-tag: ${{ github.ref_name }}
+      platforms: ${{ inputs.platforms || 'windows' }}
