@@ -131,9 +131,30 @@ Future<void> initEnv(String appType) async {
   updateSystemWindowTheme();
 }
 
+// Cliente personalizado: valores por defecto propios. Solo se aplican si el
+// usuario todavia no los ha cambiado.
+void applyCustomClientDefaults() {
+  if (bind.mainGetLocalOption(key: kCommConfKeyTheme).isEmpty) {
+    bind.mainSetLocalOption(key: kCommConfKeyTheme, value: 'dark');
+  }
+  if (bind.mainGetLocalOption(key: kOptionEnableCheckUpdate).isEmpty) {
+    bind.mainSetLocalOption(key: kOptionEnableCheckUpdate, value: 'N');
+  }
+  if (bind.mainGetLocalOption(key: kOptionAllowAutoRecordOutgoing).isEmpty) {
+    bind.mainSetLocalOption(key: kOptionAllowAutoRecordOutgoing, value: 'N');
+  }
+  if (bind.mainGetOptionSync(key: kOptionAllowAutoRecordIncoming).isEmpty) {
+    bind.mainSetOption(key: kOptionAllowAutoRecordIncoming, value: 'N');
+  }
+  if (bind.mainGetOptionSync(key: kOptionDisableUdp).isEmpty) {
+    bind.mainSetOption(key: kOptionDisableUdp, value: 'N');
+  }
+}
+
 void runMainApp(bool startService) async {
   // register uni links
   await initEnv(kAppTypeMain);
+  applyCustomClientDefaults();
   checkUpdate();
   // trigger connection status updater
   await bind.mainCheckConnectStatus();
