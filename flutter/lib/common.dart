@@ -1699,6 +1699,8 @@ void applyCustomClientDefaults({bool force = false}) {
   setMain(kOptionDirectxCapture, 'Y');
   setMain(kOptionEnableHwcodec, 'Y');
   setMain(kOptionKeepAwakeDuringIncomingSessions, 'Y');
+  // Audio habilitado por defecto (voz/microfono y audio del equipo remoto).
+  setMain(kOptionEnableAudio, 'Y');
   // Calidad de imagen optima por defecto en cada conexion.
   bind.mainSetUserDefaultOption(
       key: kOptionImageQuality, value: kRemoteImageQualityBest);

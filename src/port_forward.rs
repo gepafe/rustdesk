@@ -92,6 +92,9 @@ pub async fn listen(
     // One tunnel per mapping; the listener drops it on its way out, and that
     // ends the tunnel.
     let tunnel = Tunnel::new();
+    // Para RDP: avisa cuando termina la conexion (mstsc cerrado) para poder
+    // cerrar la ventana oculta de Port Forward en la UI.
+    let (rdp_done_tx, mut rdp_done_rx) = mpsc::channel::<()>(1);
     loop {
         tokio::select! {
             Ok((forward, addr)) = listener.accept() => {
@@ -123,12 +126,16 @@ pub async fn listen(
                 match connect_and_login(&id, &password, &mut ui_receiver, interface.clone(), &mut forward, key, token, is_rdp, &mut close_port_forward, &remote_host, remote_port).await {
                     Ok(Some(stream)) => {
                         let interface = interface.clone();
+                        let rdp_done_tx = rdp_done_tx.clone();
                         tokio::spawn(async move {
                             if let Err(err) = run_forward(forward, stream).await {
                                 interface.msgbox("error", "Error", &err.to_string(), "");
                             }
                             log::info!("connection from {:?} closed", addr);
-                       });
+                            if is_rdp {
+                                let _ = rdp_done_tx.send(()).await;
+                            }
+                        });
                     }
                     _ if close_port_forward => {
                         break;
@@ -150,6 +157,9 @@ pub async fn listen(
                     }
                     _ => {}
                 }
+            }
+            _ = rdp_done_rx.recv() => {
+                break;
             }
         }
     }

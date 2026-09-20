@@ -281,7 +281,11 @@ void runMultiWindow(
       exit(0);
   }
   // show window from hidden status
-  WindowController.fromWindowId(kWindowId!).show();
+  // La ventana de PortForward (RDP) queda oculta a proposito: no debe quedar
+  // detras ni poder cerrarse por error (cerrarla corta el RDP).
+  if (appType != kAppTypeDesktopPortForward) {
+    WindowController.fromWindowId(kWindowId!).show();
+  }
 }
 
 void runConnectionManagerScreen() async {
