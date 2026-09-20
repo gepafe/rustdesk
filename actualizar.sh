@@ -6,8 +6,9 @@
 #     ./actualizar.sh
 # y este script hace TODO automáticamente:
 #   1. Baja la última versión del repositorio oficial (upstream).
-#   2. Le aplica las personalizaciones (CM oculta y sin actualizaciones
-#      automáticas). Se mantiene el nombre y logo originales de RustDesk.
+#   2. Le aplica/actualiza las personalizaciones (CM oculta, sin actualizaciones
+#      automáticas e importador masivo de equipos en Favoritos). Se mantiene el
+#      nombre y logo originales de RustDesk.
 #   3. Compila en GitHub Actions (gratis, en la nube).
 #   4. Espera a que termine.
 #   5. Descarga el .exe de Windows a tu PC.
@@ -59,8 +60,17 @@ git remote add upstream "https://github.com/${UPSTREAM}.git"
 say "Descargando la última versión oficial (upstream)..."
 git fetch upstream --tags --prune || die "Fallo al descargar upstream (revisa conexión)."
 
-# Reset limpio a la última versión oficial (descarta todo lo anterior).
-git reset --hard upstream/"${BRANCH}" || die "Fallo al sincronizar con upstream."
+# Sincronizar SIN perder las personalizaciones: el master del fork ya las
+# contiene como commits, así que FUSIONAMOS upstream. (Antes se hacía
+# `reset --hard upstream/master`, que borraba los commits propios, incluido el
+# importador masivo de equipos.)
+git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH" "origin/$BRANCH"
+if git merge upstream/"${BRANCH}" --no-edit; then
+  say "Sincronizado con la última versión oficial (personalizaciones conservadas)."
+else
+  git merge --abort 2>/dev/null || true
+  die "Conflicto al fusionar upstream. Resuélvelo a mano en $WORKDIR y vuelve a ejecutar."
+fi
 
 # -----------------------------------------------------------------------------
 # 2. Aplicar las personalizaciones (idempotente: solo si faltan)
@@ -102,6 +112,13 @@ if grep -q 'if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_
   grep -q 'if !manually {' "$F_UPDATER" && say "  updater.rs: actualizaciones automáticas desactivadas." || warn "  updater.rs: no se pudo parchear."
 else
   grep -q 'Cliente personalizado: deshabilitar' "$F_UPDATER" && say "  updater.rs: ya desactivado." || warn "  updater.rs: patrón inesperado, revísalo."
+fi
+
+# --- 2.5 verificar que el importador masivo de equipos sigue presente ---
+if grep -q 'showImportPeersBulkDialog' flutter/lib/common/widgets/peer_tab_page.dart 2>/dev/null; then
+  say "  importador masivo de equipos: presente."
+else
+  warn "  importador masivo: NO encontrado en la barra. Una versión nueva de RustDesk pudo cambiar el archivo; revísalo."
 fi
 
 # -----------------------------------------------------------------------------
