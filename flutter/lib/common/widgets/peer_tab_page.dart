@@ -557,6 +557,12 @@ class _PeerTabPageState extends State<PeerTabPage>
           index: PeerTabIndex.ab, loading: gFFI.abModel.currentAbLoading),
       _createRefresh(
           index: PeerTabIndex.group, loading: gFFI.groupModel.groupLoading),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Importar equipos'),
+        child: Icon(Icons.playlist_add_rounded, size: 18),
+        onTap: () => showImportPeersBulkDialog(),
+      ).marginOnly(left: 6, right: 6),
       Offstage(
         offstage: model.currentTabCachedPeers.isEmpty,
         child: _createMultiSelection(),

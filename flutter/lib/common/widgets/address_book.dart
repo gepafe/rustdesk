@@ -678,94 +678,7 @@ class _AddressBookState extends State<AddressBook> {
     });
   }
 
-  void importPeersBulkAb() async {
-    var isInProgress = false;
-    var msg = "";
-    final controller = TextEditingController();
-    gFFI.dialogManager.show((setState, close, context) {
-      submit() async {
-        setState(() {
-          isInProgress = true;
-          msg = "";
-        });
-        final lines = controller.text
-            .split(RegExp(r"[\r\n]+"))
-            .map((l) => l.trim())
-            .where((l) => l.isNotEmpty)
-            .toList();
-        var ok = 0;
-        var skipped = 0;
-        for (final line in lines) {
-          final parts =
-              line.split(RegExp(r"[/;,|]+")).map((p) => p.trim()).toList();
-          if (parts.isEmpty || parts[0].isEmpty) {
-            continue;
-          }
-          final id = parts[0];
-          final alias = parts.length > 1 ? parts[1] : "";
-          final group = parts.length > 2 ? parts[2] : "";
-          if (gFFI.abModel.idContainByCurrent(id)) {
-            skipped++;
-            continue;
-          }
-          final errMsg = await gFFI.abModel.addIdToCurrent(
-              id, alias, "", List<dynamic>.of([group]), "");
-          if (errMsg != null) {
-            skipped++;
-          } else {
-            ok++;
-          }
-        }
-        setState(() {
-          isInProgress = false;
-          msg = "${translate("Importados")}: $ok, "
-              "${translate("omitidos")}: $skipped";
-        });
-        if (lines.isEmpty) {
-          setState(() {
-            msg = translate("No se encontraron equipos en el texto.");
-          });
-        }
-      }
-
-      return CustomAlertDialog(
-        title: Text(translate("Importar equipos")),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              translate(
-                  "Pega los equipos, uno por línea. Formato: ID;Nombre;Grupo"),
-              style: TextStyle(fontSize: 13),
-            ).marginOnly(bottom: 8),
-            TextField(
-              controller: controller,
-              maxLines: 12,
-              minLines: 6,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: translate("Ejemplo: 123456789;PC de Maria;Oficina"),
-                border: OutlineInputBorder(),
-              ),
-            ).workaroundFreezeLinuxMint(),
-            if (msg.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(msg, style: TextStyle(color: Colors.green)),
-              ),
-            if (isInProgress) const LinearProgressIndicator(),
-          ],
-        ),
-        actions: [
-          dialogButton("Cancel", onPressed: close, isOutline: true),
-          dialogButton("OK", onPressed: submit),
-        ],
-        onSubmit: submit,
-        onCancel: close,
-      );
-    });
-  }
+  void importPeersBulkAb() => showImportPeersBulkDialog();
 
   void abAddTag() async {
     var field = "";
@@ -986,4 +899,113 @@ MenuEntryButton<String> getEntry(String title, VoidCallback proc) {
     proc: proc,
     dismissOnClicked: true,
   );
+}
+
+/// Importa equipos en masa desde texto pegado, uno por línea.
+/// Formato por línea: `ID;Nombre;Grupo` (Nombre y Grupo son opcionales).
+///
+/// Guarda los equipos en Favoritos con su nombre (alias) para que se muestren
+/// aunque no haya servidor configurado, y también en la agenda actual cuando
+/// esté disponible.
+void showImportPeersBulkDialog() {
+  var isInProgress = false;
+  var msg = "";
+  final controller = TextEditingController();
+  gFFI.dialogManager.show((setState, close, context) {
+    submit() async {
+      setState(() {
+        isInProgress = true;
+        msg = "";
+      });
+      final lines = controller.text
+          .split(RegExp(r"[\r\n]+"))
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      var ok = 0;
+      var skipped = 0;
+      final favs = (await bind.mainGetFav()).toList();
+      var favsChanged = false;
+      for (final line in lines) {
+        final parts =
+            line.split(RegExp(r"[/;,|]+")).map((p) => p.trim()).toList();
+        if (parts.isEmpty || parts[0].isEmpty) {
+          continue;
+        }
+        final id = parts[0];
+        final alias = parts.length > 1 ? parts[1] : "";
+        final group = parts.length > 2 ? parts[2] : "";
+        // Favoritos: siempre disponible, no requiere servidor.
+        if (!favs.contains(id)) {
+          favs.add(id);
+          favsChanged = true;
+        }
+        // Guardar el nombre para que se muestre en Favoritos.
+        if (alias.isNotEmpty) {
+          try {
+            await bind.mainSetPeerAlias(id: id, alias: alias);
+          } catch (_) {}
+        }
+        // Agenda: solo si hay servidor que la soporte (self-hosted).
+        try {
+          if (gFFI.userModel.isLogin && gFFI.abModel.current.canWrite()) {
+            await gFFI.abModel.addIdToCurrent(
+                id, alias, "", List<dynamic>.of([group]), "");
+          }
+        } catch (_) {}
+        ok++;
+      }
+      if (favsChanged) {
+        await bind.mainStoreFav(favs: favs);
+        bind.mainLoadFavPeers();
+      }
+      setState(() {
+        isInProgress = false;
+        msg = "${translate("Importados")}: $ok, "
+            "${translate("omitidos")}: $skipped";
+      });
+      if (lines.isEmpty) {
+        setState(() {
+          msg = translate("No se encontraron equipos en el texto.");
+        });
+      }
+    }
+
+    return CustomAlertDialog(
+      title: Text(translate("Importar equipos")),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            translate(
+                "Pega los equipos, uno por línea. Formato: ID;Nombre;Grupo"),
+            style: TextStyle(fontSize: 13),
+          ).marginOnly(bottom: 8),
+          TextField(
+            controller: controller,
+            maxLines: 12,
+            minLines: 6,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: translate("Ejemplo: 123456789;PC de Maria;Oficina"),
+              border: OutlineInputBorder(),
+            ),
+          ).workaroundFreezeLinuxMint(),
+          if (msg.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(msg, style: TextStyle(color: Colors.green)),
+            ),
+          if (isInProgress) const LinearProgressIndicator(),
+        ],
+      ),
+      actions: [
+        dialogButton("Cancel", onPressed: close, isOutline: true),
+        dialogButton("OK", onPressed: submit),
+      ],
+      onSubmit: submit,
+      onCancel: close,
+    );
+  });
 }
