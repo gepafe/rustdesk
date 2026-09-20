@@ -1008,6 +1008,15 @@ class RustdeskImpl {
     return Future.value();
   }
 
+  Future<void> mainSetPeerInfo(
+      {required String id,
+      required String username,
+      required String hostname,
+      required String platform,
+      dynamic hint}) {
+    throw UnimplementedError("mainSetPeerInfo");
+  }
+
   Future<String> mainGetNewStoredPeers({dynamic hint}) {
     throw UnimplementedError("mainGetNewStoredPeers");
   }

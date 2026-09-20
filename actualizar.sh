@@ -121,6 +121,14 @@ else
   warn "  importador masivo: NO encontrado en la barra. Una versión nueva de RustDesk pudo cambiar el archivo; revísalo."
 fi
 
+# --- 2.6 verificar el binding que crea la ficha del equipo importado ---
+if grep -q 'main_set_peer_info' src/flutter_ffi.rs 2>/dev/null \
+   && grep -q 'pub fn set_peer_info' src/ui_interface.rs 2>/dev/null; then
+  say "  ficha de equipo importado (main_set_peer_info): presente."
+else
+  warn "  main_set_peer_info: NO encontrado. Revisa src/flutter_ffi.rs y src/ui_interface.rs."
+fi
+
 # -----------------------------------------------------------------------------
 # 3. Commit, tag y push
 # -----------------------------------------------------------------------------

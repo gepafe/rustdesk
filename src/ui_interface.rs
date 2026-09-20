@@ -334,6 +334,25 @@ pub fn set_peer_option(id: String, name: String, value: String) {
     c.store(&id);
 }
 
+// Cliente personalizado: crea/actualiza la ficha local de un equipo importado.
+// Es necesario escribir `info.platform` para que el equipo no sea descartado
+// por `PeerConfig::peers` (que filtra los peers con platform vacío) y aparezca
+// en la lista de Favoritos sin haber conectado todavía.
+#[inline]
+pub fn set_peer_info(id: String, username: String, hostname: String, platform: String) {
+    let mut c = PeerConfig::load(&id);
+    if !username.is_empty() {
+        c.info.username = username;
+    }
+    if !hostname.is_empty() {
+        c.info.hostname = hostname;
+    }
+    if !platform.is_empty() {
+        c.info.platform = platform;
+    }
+    c.store(&id);
+}
+
 #[inline]
 pub fn get_options() -> String {
     let options = {

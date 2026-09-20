@@ -946,6 +946,15 @@ void showImportPeersBulkDialog() {
             await bind.mainSetPeerAlias(id: id, alias: alias);
           } catch (_) {}
         }
+        // Crear la ficha local con platform no vacío; si no, RustDesk
+        // descarta el equipo y no aparece en Favoritos.
+        try {
+          await bind.mainSetPeerInfo(
+              id: id,
+              username: "",
+              hostname: alias.isNotEmpty ? alias : id,
+              platform: "Windows");
+        } catch (_) {}
         // Agenda: solo si hay servidor que la soporte (self-hosted).
         try {
           if (gFFI.userModel.isLogin && gFFI.abModel.current.canWrite()) {
