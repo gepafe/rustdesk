@@ -420,6 +420,7 @@ class _GeneralState extends State<_General> {
         if (!isWeb) audio(context),
         if (!isWeb) record(context),
         if (!isWeb) WaylandCard(),
+        if (!isWeb) defaultsCard(),
         other()
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
@@ -449,6 +450,15 @@ class _GeneralState extends State<_General> {
           groupValue: current,
           label: 'Follow System',
           onChanged: isOptFixed ? null : onChanged),
+    ]);
+  }
+
+  Widget defaultsCard() {
+    return _Card(title: 'Valores por defecto', children: [
+      _Button('Restaurar valores por defecto', () {
+        applyCustomClientDefaults(force: true);
+        setState(() {});
+      }),
     ]);
   }
 

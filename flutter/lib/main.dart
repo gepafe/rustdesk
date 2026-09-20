@@ -131,47 +131,6 @@ Future<void> initEnv(String appType) async {
   updateSystemWindowTheme();
 }
 
-// Cliente personalizado: valores por defecto propios. Solo se aplican si el
-// usuario todavia no los ha cambiado.
-void applyCustomClientDefaults() {
-  if (bind.mainGetLocalOption(key: kCommConfKeyTheme).isEmpty) {
-    bind.mainSetLocalOption(key: kCommConfKeyTheme, value: 'dark');
-  }
-  if (bind.mainGetLocalOption(key: kOptionEnableCheckUpdate).isEmpty) {
-    bind.mainSetLocalOption(key: kOptionEnableCheckUpdate, value: 'N');
-  }
-  if (bind.mainGetLocalOption(key: kOptionAllowAutoRecordOutgoing).isEmpty) {
-    bind.mainSetLocalOption(key: kOptionAllowAutoRecordOutgoing, value: 'N');
-  }
-  if (bind.mainGetOptionSync(key: kOptionAllowAutoRecordIncoming).isEmpty) {
-    bind.mainSetOption(key: kOptionAllowAutoRecordIncoming, value: 'N');
-  }
-  if (bind.mainGetOptionSync(key: kOptionDisableUdp).isEmpty) {
-    bind.mainSetOption(key: kOptionDisableUdp, value: 'N');
-  }
-  if (bind
-      .mainGetOptionSync(key: kOptionAllowRemoteConfigModification)
-      .isEmpty) {
-    bind.mainSetOption(
-        key: kOptionAllowRemoteConfigModification, value: 'N');
-  }
-  if (bind.mainGetOptionSync(key: kOptionEnableLanDiscovery).isEmpty) {
-    bind.mainSetOption(key: kOptionEnableLanDiscovery, value: 'N');
-  }
-  if (bind.mainGetOptionSync(key: kOptionDirectxCapture).isEmpty) {
-    bind.mainSetOption(key: kOptionDirectxCapture, value: 'Y');
-  }
-  if (bind.mainGetOptionSync(key: kOptionEnableHwcodec).isEmpty) {
-    bind.mainSetOption(key: kOptionEnableHwcodec, value: 'Y');
-  }
-  if (bind
-      .mainGetOptionSync(key: kOptionKeepAwakeDuringIncomingSessions)
-      .isEmpty) {
-    bind.mainSetOption(
-        key: kOptionKeepAwakeDuringIncomingSessions, value: 'Y');
-  }
-}
-
 void runMainApp(bool startService) async {
   // register uni links
   await initEnv(kAppTypeMain);
@@ -179,9 +138,6 @@ void runMainApp(bool startService) async {
   checkUpdate();
   // trigger connection status updater
   await bind.mainCheckConnectStatus();
-  // Cliente personalizado: calidad de imagen optima por defecto en cada conexion.
-  bind.mainSetUserDefaultOption(
-      key: kOptionImageQuality, value: kRemoteImageQualityBest);
   if (startService) {
     gFFI.serverModel.startService();
   }

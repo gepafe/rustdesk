@@ -1673,6 +1673,37 @@ bool mainGetPeerBoolOptionSync(String id, String key) {
   return option2bool(key, bind.mainGetPeerOptionSync(id: id, key: key));
 }
 
+// Cliente personalizado: aplica los valores por defecto propios del cliente.
+// Con [force] = true reescribe tambien las opciones ya configuradas (util para
+// equipos con configuracion previa). No toca contrasenas, IDs ni contactos.
+void applyCustomClientDefaults({bool force = false}) {
+  void setLocal(String key, String value) {
+    if (force || bind.mainGetLocalOption(key: key).isEmpty) {
+      bind.mainSetLocalOption(key: key, value: value);
+    }
+  }
+
+  void setMain(String key, String value) {
+    if (force || bind.mainGetOptionSync(key: key).isEmpty) {
+      bind.mainSetOption(key: key, value: value);
+    }
+  }
+
+  setLocal(kCommConfKeyTheme, 'dark');
+  setLocal(kOptionEnableCheckUpdate, 'N');
+  setLocal(kOptionAllowAutoRecordOutgoing, 'N');
+  setMain(kOptionAllowAutoRecordIncoming, 'N');
+  setMain(kOptionDisableUdp, 'N');
+  setMain(kOptionAllowRemoteConfigModification, 'N');
+  setMain(kOptionEnableLanDiscovery, 'N');
+  setMain(kOptionDirectxCapture, 'Y');
+  setMain(kOptionEnableHwcodec, 'Y');
+  setMain(kOptionKeepAwakeDuringIncomingSessions, 'Y');
+  // Calidad de imagen optima por defecto en cada conexion.
+  bind.mainSetUserDefaultOption(
+      key: kOptionImageQuality, value: kRemoteImageQualityBest);
+}
+
 // Don't use `option2bool()` and `bool2option()` to convert the session option.
 // Use `sessionGetToggleOption()` and `sessionToggleOption()` instead.
 // Because all session options use `Y` and `<Empty>` as values.
