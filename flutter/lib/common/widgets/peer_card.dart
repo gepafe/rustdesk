@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
+import '../../models/peer_folder_model.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
@@ -1011,8 +1012,63 @@ class RecentPeerCard extends BasePeerCard {
     }
 
     menuItems.add(MenuEntryDivider());
+    menuItems.add(_moveFolderAction(peer.id));
+    if (peerFolderModel.folderOf(peer.id) != null) {
+      menuItems.add(_removeFromFolderAction(peer.id));
+    }
+    menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;
+  }
+
+  @protected
+  MenuEntryButton<String> _moveFolderAction(String id) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) => Row(
+        children: [
+          Text(
+            translate('Mover a carpeta'),
+            style: style,
+          ),
+          Expanded(
+              child: Align(
+            alignment: Alignment.centerRight,
+            child: Transform.scale(
+              scale: 0.8,
+              child: const Icon(Icons.drive_file_move_outline),
+            ),
+          ).marginOnly(right: 4)),
+        ],
+      ),
+      proc: () => showPeerFolderPickerDialog(id),
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
+  }
+
+  @protected
+  MenuEntryButton<String> _removeFromFolderAction(String id) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) => Row(
+        children: [
+          Text(
+            translate('Quitar de carpeta'),
+            style: style,
+          ),
+          Expanded(
+              child: Align(
+            alignment: Alignment.centerRight,
+            child: Transform.scale(
+              scale: 0.8,
+              child: const Icon(Icons.folder_off_outlined),
+            ),
+          ).marginOnly(right: 4)),
+        ],
+      ),
+      proc: () => peerFolderModel.setPeerFolder(id, null),
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
   }
 
   @protected

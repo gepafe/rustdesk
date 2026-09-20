@@ -14,6 +14,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../common.dart';
+import '../../models/peer_folder_model.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import 'peer_card.dart';
@@ -72,12 +73,14 @@ class _PeersView extends StatefulWidget {
   final PeerFilter? peerFilter;
   final PeerCardBuilder peerCardBuilder;
   final PeerTabIndex peerTabIndex;
+  final bool grouped;
 
   const _PeersView(
       {required this.peers,
       required this.peerCardBuilder,
       required this.peerTabIndex,
       this.peerFilter,
+      this.grouped = false,
       Key? key})
       : super(key: key);
 
@@ -263,33 +266,42 @@ class _PeersViewState extends State<_PeersView>
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
             // Continious rebuilds of `ListView.builder` will cause memory leak.
             // Simple demo can reproduce this issue.
-            final Widget child = Obx(() => stateGlobal.isPortrait.isTrue
-                ? ListView.builder(
-                    itemCount: peers.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return buildOnePeer(peers[index], true).marginOnly(
-                          top: index == 0 ? 0 : space / 2, bottom: space / 2);
-                    },
-                  )
-                : peerCardUiType.value == PeerUiType.list
-                    ? ListView.builder(
-                        controller: _scrollController,
-                        itemCount: peers.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return buildOnePeer(peers[index], false).marginOnly(
-                              right: space,
-                              top: index == 0 ? 0 : space / 2,
-                              bottom: space / 2);
-                        },
-                      )
-                    : DynamicGridView.builder(
-                        gridDelegate: SliverGridDelegateWithWrapping(
-                            mainAxisSpacing: space / 2,
-                            crossAxisSpacing: space),
-                        itemCount: peers.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return buildOnePeer(peers[index], false);
-                        }));
+            Widget child;
+            if (widget.grouped && peerFolderModel.folders.isNotEmpty) {
+              child = AnimatedBuilder(
+                animation: peerFolderModel,
+                builder: (context, _) =>
+                    _buildGroupedList(peers, buildOnePeer),
+              );
+            } else {
+              child = Obx(() => stateGlobal.isPortrait.isTrue
+                  ? ListView.builder(
+                      itemCount: peers.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        return buildOnePeer(peers[index], true).marginOnly(
+                            top: index == 0 ? 0 : space / 2, bottom: space / 2);
+                      },
+                    )
+                  : peerCardUiType.value == PeerUiType.list
+                      ? ListView.builder(
+                          controller: _scrollController,
+                          itemCount: peers.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return buildOnePeer(peers[index], false).marginOnly(
+                                right: space,
+                                top: index == 0 ? 0 : space / 2,
+                                bottom: space / 2);
+                          },
+                        )
+                      : DynamicGridView.builder(
+                          gridDelegate: SliverGridDelegateWithWrapping(
+                              mainAxisSpacing: space / 2,
+                              crossAxisSpacing: space),
+                          itemCount: peers.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return buildOnePeer(peers[index], false);
+                          }));
+            }
 
             if (updateEvent == UpdateEvent.load) {
               _curPeers.clear();
@@ -308,6 +320,65 @@ class _PeersViewState extends State<_PeersView>
     }, obslist);
 
     return body;
+  }
+
+  Widget _buildGroupedList(
+      List<Peer> peers, Widget Function(Peer, bool) buildOnePeer) {
+    final fm = peerFolderModel;
+    final assigned = <String>{};
+    final children = <Widget>[];
+
+    void addPeer(Peer p) {
+      children.add(buildOnePeer(p, false).marginOnly(
+          right: space, top: space / 2, bottom: space / 2));
+    }
+
+    for (final folder in fm.folders) {
+      final members = peers.where((p) => folder.ids.contains(p.id)).toList();
+      assigned.addAll(members.map((e) => e.id));
+      children.add(_FolderHeader(
+        name: folder.name,
+        total: members.length,
+        online: members.where((e) => e.online).length,
+        expanded: folder.expanded,
+        onTap: () => fm.toggleExpanded(folder.name),
+        onRename: () => showFolderRenameDialog(folder.name),
+        onDelete: () => showFolderDeleteDialog(folder.name),
+      ));
+      if (folder.expanded) {
+        if (members.isEmpty) {
+          children.add(Padding(
+            padding: const EdgeInsets.only(left: 30, top: 2, bottom: 6),
+            child: Text(translate('Sin equipos'),
+                style: TextStyle(
+                    fontSize: 12, color: Theme.of(context).tabBarTheme.labelColor)),
+          ));
+        } else {
+          members.forEach(addPeer);
+        }
+      }
+    }
+
+    final ungrouped = peers
+        .where((p) => !assigned.contains(p.id) && fm.folderOf(p.id) == null)
+        .toList();
+    if (ungrouped.isNotEmpty) {
+      children.add(_FolderHeader(
+        name: translate('Sin grupo'),
+        total: ungrouped.length,
+        online: ungrouped.where((e) => e.online).length,
+        expanded: fm.ungroupedExpanded,
+        onTap: () => fm.toggleUngroupedExpanded(),
+      ));
+      if (fm.ungroupedExpanded) {
+        ungrouped.forEach(addPeer);
+      }
+    }
+
+    return ListView(
+      controller: _scrollController,
+      children: children,
+    );
   }
 
   var _queryInterval = const Duration(seconds: 20);
@@ -414,12 +485,14 @@ abstract class BasePeersView extends StatelessWidget {
   final PeerTabIndex peerTabIndex;
   final PeerFilter? peerFilter;
   final PeerCardBuilder peerCardBuilder;
+  final bool grouped;
 
   const BasePeersView({
     Key? key,
     required this.peerTabIndex,
     this.peerFilter,
     required this.peerCardBuilder,
+    this.grouped = false,
   }) : super(key: key);
 
   @override
@@ -446,7 +519,8 @@ abstract class BasePeersView extends StatelessWidget {
         peers: peers,
         peerFilter: peerFilter,
         peerCardBuilder: peerCardBuilder,
-        peerTabIndex: peerTabIndex);
+        peerTabIndex: peerTabIndex,
+        grouped: grouped);
   }
 }
 
@@ -456,6 +530,7 @@ class RecentPeersView extends BasePeersView {
       : super(
           key: key,
           peerTabIndex: PeerTabIndex.recent,
+          grouped: true,
           peerCardBuilder: (Peer peer) => RecentPeerCard(
             peer: peer,
             menuPadding: menuPadding,
@@ -594,5 +669,77 @@ class MyGroupPeerView extends BasePeersView {
       }
     }
     return true;
+  }
+}
+
+/// Cabecera de carpeta (grupo) colapsable en la lista de sesiones recientes.
+class _FolderHeader extends StatelessWidget {
+  final String name;
+  final int total;
+  final int online;
+  final bool expanded;
+  final VoidCallback onTap;
+  final VoidCallback? onRename;
+  final VoidCallback? onDelete;
+
+  const _FolderHeader({
+    required this.name,
+    required this.total,
+    required this.online,
+    required this.expanded,
+    required this.onTap,
+    this.onRename,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = Theme.of(context).tabBarTheme.labelColor;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          children: [
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_down
+                  : Icons.keyboard_arrow_right,
+              size: 20,
+              color: labelColor,
+            ),
+            Icon(Icons.folder, size: 18, color: labelColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Text(
+              '$online/$total',
+              style: TextStyle(fontSize: 12, color: labelColor),
+            ),
+            if (onRename != null || onDelete != null)
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_horiz, size: 18, color: labelColor),
+                tooltip: '',
+                padding: EdgeInsets.zero,
+                onSelected: (v) {
+                  if (v == 'rename') onRename?.call();
+                  if (v == 'delete') onDelete?.call();
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                      value: 'rename', child: Text(translate('Renombrar'))),
+                  PopupMenuItem(
+                      value: 'delete', child: Text(translate('Eliminar'))),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

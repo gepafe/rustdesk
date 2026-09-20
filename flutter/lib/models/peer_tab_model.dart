@@ -37,12 +37,13 @@ class PeerTabModel with ChangeNotifier {
     IconFont.addressBook,
     IconFont.deviceGroupFill,
   ];
+  // Cliente personalizado: solo se muestra la pestaña de sesiones recientes.
   List<bool> isEnabled = List.from([
     true,
-    true,
-    !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
-    !(bind.isDisableAb() || bind.isDisableAccount()),
-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
+    false,
+    false,
+    false,
+    false,
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {
@@ -84,6 +85,10 @@ class PeerTabModel with ChangeNotifier {
     } catch (e) {
       debugPrint("failed to get peer tab visible list:$e");
     }
+    // Cliente personalizado: forzar que solo sea visible "Recent sessions".
+    for (int i = 0; i < _isVisible.length; i++) {
+      _isVisible[i] = i == PeerTabIndex.recent.index;
+    }
     // order
     try {
       final option = bind.getLocalFlutterOption(k: kOptionPeerTabOrder);
@@ -109,11 +114,8 @@ class PeerTabModel with ChangeNotifier {
       debugPrint("failed to get peer tab order list: $e");
     }
     // init currentTab
-    _currentTab =
-        int.tryParse(bind.getLocalFlutterOption(k: kOptionPeerTabIndex)) ?? 0;
-    if (_currentTab < 0 || _currentTab >= maxTabCount) {
-      _currentTab = 0;
-    }
+    // Cliente personalizado: forzar la pestaña de sesiones recientes.
+    _currentTab = PeerTabIndex.recent.index;
     _trySetCurrentTabToFirstVisibleEnabled();
   }
 

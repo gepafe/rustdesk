@@ -13,6 +13,7 @@ import 'package:flutter_hbb/desktop/widgets/material_mod_popup_menu.dart'
     as mod_menu;
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
+import 'package:flutter_hbb/models/peer_folder_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 
 import 'package:flutter_hbb/models/peer_tab_model.dart';
@@ -563,6 +564,12 @@ class _PeerTabPageState extends State<PeerTabPage>
         child: Icon(Icons.playlist_add_rounded, size: 18),
         onTap: () => showImportPeersBulkDialog(),
       ).marginOnly(left: 6, right: 6),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Nueva carpeta'),
+        child: Icon(Icons.create_new_folder_outlined, size: 18),
+        onTap: () => showNewFolderDialog(),
+      ).marginOnly(right: 6),
       Offstage(
         offstage: model.currentTabCachedPeers.isEmpty,
         child: _createMultiSelection(),
