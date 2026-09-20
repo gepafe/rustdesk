@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
+import '../../common/widgets/pin_lock.dart';
 import '../../consts.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
@@ -995,6 +996,21 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
               SettingsTile(
                 title: Text(translate("Directory")),
                 description: Text(bind.mainVideoSaveDirectory(root: false)),
+              ),
+            ],
+          ),
+        if (!disabledSettings && !hideSecuritySettings)
+          SettingsSection(
+            title: Text(translate("Security")),
+            tiles: [
+              SettingsTile(
+                title: Text(translate("Lock app with PIN")),
+                leading: Icon(Icons.lock_outline),
+                value: getAppLockPin().isEmpty ? null : const Text('••••'),
+                onPressed: (context) =>
+                    changeAppLockPinDialog(getAppLockPin(), () {
+                  setState(() {});
+                }),
               ),
             ],
           ),

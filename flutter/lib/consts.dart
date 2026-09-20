@@ -212,6 +212,9 @@ const String kOptionDisableChangePermanentPassword =
     "disable-change-permanent-password";
 const String kOptionDisableChangeId = "disable-change-id";
 const String kOptionDisableUnlockPin = "disable-unlock-pin";
+// Cliente personalizado: PIN propio para desbloquear la app al abrirla
+// (separado del PIN de la sesión de Seguridad).
+const String kOptionAppLockPin = "app-lock-pin";
 const kHideUsernameOnCard = "hide-username-on-card";
 const String kOptionHideHelpCards = "hide-help-cards";
 const String kOptionAllowDeepLinkPassword = "allow-deep-link-password";

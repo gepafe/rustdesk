@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
+import '../../common/widgets/pin_lock.dart';
 
 const double _kTabWidth = 200;
 const double _kTabHeight = 42;
@@ -1408,7 +1409,8 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
         _OptionCheckBox(context, 'allow-only-conn-window-open-tip',
             'allow-only-conn-window-open',
             reverse: false, enabled: enabled),
-      if (bind.mainIsInstalled() && !isUnlockPinDisabled()) unlockPin()
+      if (bind.mainIsInstalled() && !isUnlockPinDisabled()) unlockPin(),
+      appLockPin()
     ]);
   }
 
@@ -1732,6 +1734,39 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
       onTap: enabled
           ? () {
               onChanged(!unlockPin.isNotEmpty);
+            }
+          : null,
+    ).marginOnly(left: _kCheckBoxLeftMargin);
+  }
+
+  Widget appLockPin() {
+    bool enabled = !locked;
+    RxBool appLock = isAppLockEnabled().obs;
+    update() async {
+      appLock.value = isAppLockEnabled();
+    }
+
+    onChanged(bool? checked) async {
+      changeAppLockPinDialog(getAppLockPin(), update);
+    }
+
+    return GestureDetector(
+      child: Obx(() => Row(
+            children: [
+              Checkbox(
+                      value: appLock.value,
+                      onChanged: enabled ? onChanged : null)
+                  .marginOnly(right: 5),
+              Expanded(
+                  child: Text(
+                translate('Lock app with PIN'),
+                style: TextStyle(color: disabledTextColor(context, enabled)),
+              ))
+            ],
+          )),
+      onTap: enabled
+          ? () {
+              onChanged(!appLock.value);
             }
           : null,
     ).marginOnly(left: _kCheckBoxLeftMargin);

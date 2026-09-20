@@ -1,14 +1,96 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/widgets/dialog.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 
-/// Cliente personalizado: pantalla de bloqueo al abrir la aplicación.
+/// Cliente personalizado: bloqueo con PIN al abrir la aplicación.
 ///
-/// Pide el MISMO PIN que se configura en Configuración -> Seguridad.
-/// Si no hay PIN configurado (o está deshabilitado), no bloquea la app.
+/// Usa un PIN PROPIO (local option [kOptionAppLockPin]), separado del PIN de la
+/// sesión de Seguridad. Si no hay PIN configurado, no bloquea la app.
 /// Aplica a escritorio, móvil y Linux (no en la versión web).
 /// Solo afecta a la interfaz; las conexiones entrantes las atiende el
 /// servicio, por lo que siguen funcionando con normalidad.
+
+/// Lee el PIN de bloqueo de la app (guardado codificado en una local option).
+String getAppLockPin() {
+  final raw = bind.mainGetLocalOption(key: kOptionAppLockPin);
+  if (raw.isEmpty) return '';
+  try {
+    return utf8.decode(base64.decode(raw));
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Guarda (o borra, si se pasa vacío) el PIN de bloqueo de la app.
+Future<void> setAppLockPin(String pin) async {
+  await bind.mainSetLocalOption(
+      key: kOptionAppLockPin,
+      value: pin.isEmpty ? '' : base64Encode(utf8.encode(pin)));
+}
+
+/// True si hay un PIN de bloqueo de la app configurado.
+bool isAppLockEnabled() => getAppLockPin().isNotEmpty;
+
+/// Diálogo para definir/cambiar/quitar el PIN de bloqueo de la app.
+/// Dejar el campo vacío elimina el bloqueo.
+void changeAppLockPinDialog(String oldPin, Function() callback) {
+  final pinController = TextEditingController(text: oldPin);
+  final confirmController = TextEditingController(text: oldPin);
+  String? pinErrorText;
+  String? confirmationErrorText;
+  final maxLength = bind.mainMaxEncryptLen();
+  gFFI.dialogManager.show((setState, close, context) {
+    submit() async {
+      pinErrorText = null;
+      confirmationErrorText = null;
+      final pin = pinController.text.trim();
+      final confirm = confirmController.text.trim();
+      if (pin != confirm) {
+        setState(() {
+          confirmationErrorText =
+              translate('The confirmation is not identical.');
+        });
+        return;
+      }
+      await setAppLockPin(pin);
+      callback.call();
+      close();
+    }
+
+    return CustomAlertDialog(
+      title: Text(translate("Set app PIN")),
+      content: Column(
+        children: [
+          DialogTextField(
+            title: 'PIN',
+            controller: pinController,
+            obscureText: true,
+            errorText: pinErrorText,
+            maxLength: maxLength,
+          ),
+          DialogTextField(
+            title: translate('Confirmation'),
+            controller: confirmController,
+            obscureText: true,
+            errorText: confirmationErrorText,
+            maxLength: maxLength,
+          )
+        ],
+      ),
+      actions: [
+        dialogButton(translate("Cancel"), onPressed: close, isOutline: true),
+        dialogButton(translate("OK"), onPressed: submit),
+      ],
+      onSubmit: submit,
+      onCancel: close,
+    );
+  });
+}
+
 class PinLockGate extends StatefulWidget {
   final Widget child;
 
@@ -27,7 +109,7 @@ class _PinLockGateState extends State<PinLockGate> {
   @override
   void initState() {
     super.initState();
-    _correctPin = isUnlockPinDisabled() ? '' : bind.mainGetUnlockPin();
+    _correctPin = getAppLockPin();
     // Si no hay PIN configurado, no se bloquea la aplicación.
     _unlocked = _correctPin.isEmpty;
   }
