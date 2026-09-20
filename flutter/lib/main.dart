@@ -498,11 +498,10 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           theme: MyTheme.lightTheme,
           darkTheme: MyTheme.darkTheme,
           themeMode: MyTheme.currentThemeMode(),
-          home: isDesktop
-              ? const PinLockGate(child: DesktopTabPage())
-              : isWeb
-                  ? WebHomePage()
-                  : HomePage(),
+          home: isWeb
+              ? WebHomePage()
+              : PinLockGate(
+                  child: isDesktop ? const DesktopTabPage() : HomePage()),
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

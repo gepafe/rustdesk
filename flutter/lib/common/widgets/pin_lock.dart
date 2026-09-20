@@ -6,8 +6,9 @@ import 'package:flutter_hbb/models/platform_model.dart';
 ///
 /// Pide el MISMO PIN que se configura en Configuración -> Seguridad.
 /// Si no hay PIN configurado (o está deshabilitado), no bloquea la app.
-/// Solo afecta a la ventana principal; las conexiones entrantes las atiende
-/// el servicio, por lo que siguen funcionando con normalidad.
+/// Aplica a escritorio, móvil y Linux (no en la versión web).
+/// Solo afecta a la interfaz; las conexiones entrantes las atiende el
+/// servicio, por lo que siguen funcionando con normalidad.
 class PinLockGate extends StatefulWidget {
   final Widget child;
 
@@ -54,42 +55,47 @@ class _PinLockGateState extends State<PinLockGate> {
   Widget build(BuildContext context) {
     if (_unlocked) return widget.child;
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lock_outline, size: 56),
-              const SizedBox(height: 16),
-              Text(
-                'Introduce el PIN para abrir',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline, size: 56),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Introduce el PIN para abrir',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    obscureText: true,
+                    maxLength: bind.mainMaxEncryptLen(),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                    decoration: InputDecoration(
+                      labelText: 'PIN',
+                      errorText: _error,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _submit,
+                      child: const Text('Desbloquear'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _controller,
-                autofocus: true,
-                obscureText: true,
-                maxLength: bind.mainMaxEncryptLen(),
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: 'PIN',
-                  errorText: _error,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  child: const Text('Desbloquear'),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
