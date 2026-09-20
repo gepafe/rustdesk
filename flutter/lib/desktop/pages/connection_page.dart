@@ -331,13 +331,15 @@ class _ConnectionPageState extends State<ConnectionPage>
       {bool isFileTransfer = false,
       bool isViewCamera = false,
       bool isTerminal = false,
-      bool isTcpTunneling = false}) {
+      bool isTcpTunneling = false,
+      bool isRDP = false}) {
     var id = _idController.id;
     connect(context, id,
         isFileTransfer: isFileTransfer,
         isViewCamera: isViewCamera,
         isTerminal: isTerminal,
-        isTcpTunneling: isTcpTunneling);
+        isTcpTunneling: isTcpTunneling,
+        isRDP: isRDP);
   }
 
   /// UI for the remote ID TextField.
@@ -569,6 +571,11 @@ class _ConnectionPageState extends State<ConnectionPage>
                                     // `connect` routes this through the
                                     // desktop path only; the peer card gates
                                     // it the same way.
+                                    if (isDesktop)
+                                      (
+                                        'RDP',
+                                        () => onConnect(isRDP: true)
+                                      ),
                                     if (isDesktop)
                                       (
                                         'TCP tunneling',
