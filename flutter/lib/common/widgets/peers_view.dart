@@ -266,42 +266,42 @@ class _PeersViewState extends State<_PeersView>
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
             // Continious rebuilds of `ListView.builder` will cause memory leak.
             // Simple demo can reproduce this issue.
-            Widget child;
-            if (widget.grouped && peerFolderModel.folders.isNotEmpty) {
-              child = AnimatedBuilder(
-                animation: peerFolderModel,
-                builder: (context, _) =>
-                    _buildGroupedList(peers, buildOnePeer),
-              );
-            } else {
-              child = Obx(() => stateGlobal.isPortrait.isTrue
-                  ? ListView.builder(
-                      itemCount: peers.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return buildOnePeer(peers[index], true).marginOnly(
-                            top: index == 0 ? 0 : space / 2, bottom: space / 2);
-                      },
-                    )
-                  : peerCardUiType.value == PeerUiType.list
-                      ? ListView.builder(
-                          controller: _scrollController,
-                          itemCount: peers.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            return buildOnePeer(peers[index], false).marginOnly(
-                                right: space,
-                                top: index == 0 ? 0 : space / 2,
-                                bottom: space / 2);
-                          },
-                        )
-                      : DynamicGridView.builder(
-                          gridDelegate: SliverGridDelegateWithWrapping(
-                              mainAxisSpacing: space / 2,
-                              crossAxisSpacing: space),
-                          itemCount: peers.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            return buildOnePeer(peers[index], false);
-                          }));
-            }
+            Widget plainList() => Obx(() => stateGlobal.isPortrait.isTrue
+                ? ListView.builder(
+                    itemCount: peers.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return buildOnePeer(peers[index], true).marginOnly(
+                          top: index == 0 ? 0 : space / 2, bottom: space / 2);
+                    },
+                  )
+                : peerCardUiType.value == PeerUiType.list
+                    ? ListView.builder(
+                        controller: _scrollController,
+                        itemCount: peers.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          return buildOnePeer(peers[index], false).marginOnly(
+                              right: space,
+                              top: index == 0 ? 0 : space / 2,
+                              bottom: space / 2);
+                        },
+                      )
+                    : DynamicGridView.builder(
+                        gridDelegate: SliverGridDelegateWithWrapping(
+                            mainAxisSpacing: space / 2,
+                            crossAxisSpacing: space),
+                        itemCount: peers.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          return buildOnePeer(peers[index], false);
+                        }));
+
+            final Widget child = widget.grouped
+                ? AnimatedBuilder(
+                    animation: peerFolderModel,
+                    builder: (context, _) => peerFolderModel.folders.isNotEmpty
+                        ? _buildGroupedList(peers, buildOnePeer)
+                        : plainList(),
+                  )
+                : plainList();
 
             if (updateEvent == UpdateEvent.load) {
               _curPeers.clear();
