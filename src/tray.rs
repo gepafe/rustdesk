@@ -10,7 +10,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub fn start_tray() {
-    if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
+    // Cliente personalizado (modo incognito en Windows): no mostrar la bandeja,
+    // para que no quede rastro de la sesion (el tooltip muestra "N sessions").
+    if cfg!(target_os = "windows")
+        || crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y"
+    {
         #[cfg(not(target_os = "macos"))]
         {
             return;
