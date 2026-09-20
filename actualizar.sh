@@ -129,6 +129,14 @@ else
   warn "  main_set_peer_info: NO encontrado. Revisa src/flutter_ffi.rs y src/ui_interface.rs."
 fi
 
+# --- 2.7 verificar la pantalla de bloqueo con PIN al abrir la app ---
+if grep -q 'PinLockGate' flutter/lib/main.dart 2>/dev/null \
+   && [ -f flutter/lib/common/widgets/pin_lock.dart ]; then
+  say "  bloqueo con PIN al abrir: presente."
+else
+  warn "  bloqueo con PIN: NO encontrado. Revisa flutter/lib/common/widgets/pin_lock.dart y main.dart."
+fi
+
 # -----------------------------------------------------------------------------
 # 3. Commit, tag y push
 # -----------------------------------------------------------------------------
