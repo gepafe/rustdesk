@@ -141,14 +141,10 @@ Future<void> startPreviewCaptures() async {
     try {
       await bind.mainSetLocalOption(
           key: kOptionPreviewCaptureActive, value: p.id);
-      final windowId =
-          await rustDeskWinManager.newRemoteDesktop(p.id, forceRelay: false);
-      for (var i = 0; i < 15; i++) {
+      await rustDeskWinManager.newRemoteDesktop(p.id, forceRelay: false);
+      for (var i = 0; i < 20; i++) {
         await Future.delayed(const Duration(seconds: 2));
         if (await file.exists()) break;
-        try {
-          await bind.sessionTakeScreenshot(sessionId: windowId, display: 0);
-        } catch (_) {}
       }
       if (await file.exists()) {
         previewFrames[p.id] = await file.readAsBytes();

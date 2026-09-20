@@ -3903,6 +3903,28 @@ class FFI {
     ffiModel.waitForImageTimer = null;
   }
 
+  bool _previewCaptureScheduled = false;
+
+  // En la ventana de sesion: pide capturas mientras el equipo siga marcado
+  // como objetivo de la galeria de vista previa.
+  void _schedulePreviewCapture(String peerId) {
+    if (_previewCaptureScheduled) return;
+    _previewCaptureScheduled = true;
+    Future(() async {
+      for (var i = 0; i < 20; i++) {
+        await Future.delayed(const Duration(seconds: 2));
+        String active = '';
+        try {
+          active = bind.mainGetLocalOption(key: kOptionPreviewCaptureActive);
+        } catch (_) {}
+        if (active != peerId) break;
+        try {
+          await bind.sessionTakeScreenshot(sessionId: sessionId, display: 0);
+        } catch (_) {}
+      }
+    });
+  }
+
   /// Start with the given [id]. Only transfer file if [isFileTransfer], only view camera if [isViewCamera], only port forward if [isPortForward].
   void start(
     String id, {
@@ -4007,6 +4029,11 @@ class FFI {
       // and then the displays' capturing requests can be sent.
       stream = bind.sessionStartWithDisplays(
           sessionId: sessionId, id: id, displays: Int32List.fromList(displays));
+    }
+
+    // Vista previa: captura automatica al abrir la sesion de un equipo marcado.
+    if (connType == ConnType.defaultConn) {
+      _schedulePreviewCapture(id);
     }
 
     if (isWeb) {
