@@ -29,11 +29,13 @@ class PeerFolder {
 /// Almacen local de carpetas de equipos (persistido en una opcion local).
 class PeerFolderModel extends ChangeNotifier {
   static const String _kOption = 'device-folders';
+  static const String _kFlagsOption = 'peer-flags';
   final List<PeerFolder> folders = <PeerFolder>[];
   bool ungroupedExpanded = true;
 
   PeerFolderModel() {
     load();
+    _loadFlags();
   }
 
   void load() {
@@ -119,6 +121,52 @@ class PeerFolderModel extends ChangeNotifier {
   void toggleUngroupedExpanded() {
     ungroupedExpanded = !ungroupedExpanded;
     notifyListeners();
+  }
+
+  // Marcas por equipo (vista previa / solo ver), persistidas localmente.
+  final Map<String, Map<String, bool>> _flags = <String, Map<String, bool>>{};
+
+  bool isPreview(String id) => _flags[id]?['preview'] == true;
+  bool isViewOnly(String id) => _flags[id]?['viewOnly'] == true;
+
+  void setPreview(String id, bool value) {
+    _setFlag(id, 'preview', value);
+  }
+
+  void setViewOnly(String id, bool value) {
+    _setFlag(id, 'viewOnly', value);
+  }
+
+  void _setFlag(String id, String key, bool value) {
+    (_flags[id] ??= <String, bool>{})[key] = value;
+    _saveFlags();
+    notifyListeners();
+  }
+
+  void _loadFlags() {
+    try {
+      final raw = bind.getLocalFlutterOption(k: _kFlagsOption);
+      if (raw.isEmpty) return;
+      final map = jsonDecode(raw) as Map;
+      _flags.clear();
+      map.forEach((k, v) {
+        final m = <String, bool>{};
+        (v as Map).forEach((k2, v2) {
+          if (v2 is bool) m[k2.toString()] = v2;
+        });
+        _flags[k.toString()] = m;
+      });
+    } catch (e) {
+      debugPrint('failed to load peer flags: $e');
+    }
+  }
+
+  void _saveFlags() {
+    try {
+      bind.setLocalFlutterOption(k: _kFlagsOption, v: jsonEncode(_flags));
+    } catch (e) {
+      debugPrint('failed to save peer flags: $e');
+    }
   }
 }
 
