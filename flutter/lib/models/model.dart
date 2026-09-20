@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
+import 'package:flutter_hbb/common/widgets/preview_gallery.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
@@ -485,8 +486,34 @@ class FfiModel with ChangeNotifier {
     };
   }
 
-  _handleScreenshot(
-      Map<String, dynamic> evt, SessionID sessionId, String peerId) {
+  bool _isPreviewCaptureActive(String peerId) {
+    if (peerId.isEmpty) return false;
+    try {
+      return bind.mainGetLocalOption(key: kOptionPreviewCaptureActive) ==
+          peerId;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _tryPreviewCapture(SessionID sessionId, String peerId) async {
+    if (!_isPreviewCaptureActive(peerId)) return false;
+    final path = previewTempPath(peerId);
+    await bind.sessionHandleScreenshot(sessionId: sessionId, action: '0:$path');
+    if (stateGlobal.windowId != kMainWindowId) {
+      // La ventana de sesion se cierra sola tras guardar el frame.
+      try {
+        await WindowController.fromWindowId(stateGlobal.windowId).close();
+      } catch (_) {}
+    }
+    return true;
+  }
+
+  Future<void> _handleScreenshot(
+      Map<String, dynamic> evt, SessionID sessionId, String peerId) async {
+    if (await _tryPreviewCapture(sessionId, peerId)) {
+      return;
+    }
     timerScreenshot?.cancel();
     timerScreenshot = null;
     final msg = evt['msg'] ?? '';
