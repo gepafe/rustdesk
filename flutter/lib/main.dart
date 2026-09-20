@@ -137,6 +137,9 @@ void runMainApp(bool startService) async {
   checkUpdate();
   // trigger connection status updater
   await bind.mainCheckConnectStatus();
+  // Cliente personalizado: calidad de imagen optima por defecto en cada conexion.
+  bind.mainSetUserDefaultOption(
+      key: kOptionImageQuality, value: kRemoteImageQualityBest);
   if (startService) {
     gFFI.serverModel.startService();
   }

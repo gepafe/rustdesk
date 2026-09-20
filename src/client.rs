@@ -3456,6 +3456,9 @@ impl LoginConfigHandler {
             } else {
                 Some(ImageQuality::Balanced)
             }
+        } else if q.is_empty() {
+            // Cliente personalizado: calidad de imagen optima por defecto.
+            Some(ImageQuality::Best)
         } else {
             None
         }
