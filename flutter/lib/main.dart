@@ -149,6 +149,27 @@ void applyCustomClientDefaults() {
   if (bind.mainGetOptionSync(key: kOptionDisableUdp).isEmpty) {
     bind.mainSetOption(key: kOptionDisableUdp, value: 'N');
   }
+  if (bind
+      .mainGetOptionSync(key: kOptionAllowRemoteConfigModification)
+      .isEmpty) {
+    bind.mainSetOption(
+        key: kOptionAllowRemoteConfigModification, value: 'N');
+  }
+  if (bind.mainGetOptionSync(key: kOptionEnableLanDiscovery).isEmpty) {
+    bind.mainSetOption(key: kOptionEnableLanDiscovery, value: 'N');
+  }
+  if (bind.mainGetOptionSync(key: kOptionDirectxCapture).isEmpty) {
+    bind.mainSetOption(key: kOptionDirectxCapture, value: 'Y');
+  }
+  if (bind.mainGetOptionSync(key: kOptionEnableHwcodec).isEmpty) {
+    bind.mainSetOption(key: kOptionEnableHwcodec, value: 'Y');
+  }
+  if (bind
+      .mainGetOptionSync(key: kOptionKeepAwakeDuringIncomingSessions)
+      .isEmpty) {
+    bind.mainSetOption(
+        key: kOptionKeepAwakeDuringIncomingSessions, value: 'Y');
+  }
 }
 
 void runMainApp(bool startService) async {
