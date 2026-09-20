@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
-import 'package:flutter_hbb/common/widgets/preview_gallery.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
@@ -486,34 +485,8 @@ class FfiModel with ChangeNotifier {
     };
   }
 
-  bool _isPreviewCaptureActive(String peerId) {
-    if (peerId.isEmpty) return false;
-    try {
-      return bind.mainGetLocalOption(key: kOptionPreviewCaptureActive) ==
-          peerId;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<bool> _tryPreviewCapture(SessionID sessionId, String peerId) async {
-    if (!_isPreviewCaptureActive(peerId)) return false;
-    final path = previewTempPath(peerId);
-    await bind.sessionHandleScreenshot(sessionId: sessionId, action: '0:$path');
-    if (stateGlobal.windowId != kMainWindowId) {
-      // La ventana de sesion se cierra sola tras guardar el frame.
-      try {
-        await WindowController.fromWindowId(stateGlobal.windowId).close();
-      } catch (_) {}
-    }
-    return true;
-  }
-
-  Future<void> _handleScreenshot(
-      Map<String, dynamic> evt, SessionID sessionId, String peerId) async {
-    if (await _tryPreviewCapture(sessionId, peerId)) {
-      return;
-    }
+  _handleScreenshot(
+      Map<String, dynamic> evt, SessionID sessionId, String peerId) {
     timerScreenshot?.cancel();
     timerScreenshot = null;
     final msg = evt['msg'] ?? '';
@@ -3903,28 +3876,6 @@ class FFI {
     ffiModel.waitForImageTimer = null;
   }
 
-  bool _previewCaptureScheduled = false;
-
-  // En la ventana de sesion: pide capturas mientras el equipo siga marcado
-  // como objetivo de la galeria de vista previa.
-  void _schedulePreviewCapture(String peerId) {
-    if (_previewCaptureScheduled) return;
-    _previewCaptureScheduled = true;
-    Future(() async {
-      for (var i = 0; i < 20; i++) {
-        await Future.delayed(const Duration(seconds: 2));
-        String active = '';
-        try {
-          active = bind.mainGetLocalOption(key: kOptionPreviewCaptureActive);
-        } catch (_) {}
-        if (active != peerId) break;
-        try {
-          await bind.sessionTakeScreenshot(sessionId: sessionId, display: 0);
-        } catch (_) {}
-      }
-    });
-  }
-
   /// Start with the given [id]. Only transfer file if [isFileTransfer], only view camera if [isViewCamera], only port forward if [isPortForward].
   void start(
     String id, {
@@ -4029,11 +3980,6 @@ class FFI {
       // and then the displays' capturing requests can be sent.
       stream = bind.sessionStartWithDisplays(
           sessionId: sessionId, id: id, displays: Int32List.fromList(displays));
-    }
-
-    // Vista previa: captura automatica al abrir la sesion de un equipo marcado.
-    if (connType == ConnType.defaultConn) {
-      _schedulePreviewCapture(id);
     }
 
     if (isWeb) {

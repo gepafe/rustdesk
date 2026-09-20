@@ -123,15 +123,10 @@ class PeerFolderModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Marcas por equipo (vista previa / solo ver), persistidas localmente.
+  // Marca por equipo (solo ver), persistida localmente.
   final Map<String, Map<String, bool>> _flags = <String, Map<String, bool>>{};
 
-  bool isPreview(String id) => _flags[id]?['preview'] == true;
   bool isViewOnly(String id) => _flags[id]?['viewOnly'] == true;
-
-  void setPreview(String id, bool value) {
-    _setFlag(id, 'preview', value);
-  }
 
   void setViewOnly(String id, bool value) {
     _setFlag(id, 'viewOnly', value);

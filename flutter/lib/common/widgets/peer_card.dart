@@ -1017,7 +1017,6 @@ class RecentPeerCard extends BasePeerCard {
     }
     menuItems.add(MenuEntryDivider());
     menuItems.add(_viewOnlyAction(peer.id));
-    menuItems.add(_previewAction(peer.id));
     menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;
@@ -1097,33 +1096,6 @@ class RecentPeerCard extends BasePeerCard {
       ),
       proc: () => bind.mainSetPeerOption(
           id: id, key: kOptionViewOnly, value: enabled ? '' : 'Y'),
-      padding: menuPadding,
-      dismissOnClicked: true,
-    );
-  }
-
-  @protected
-  MenuEntryButton<String> _previewAction(String id) {
-    final enabled = peerFolderModel.isPreview(id);
-    return MenuEntryButton<String>(
-      childBuilder: (TextStyle? style) => Row(
-        children: [
-          Text(
-            translate('Vista previa'),
-            style: style,
-          ),
-          Expanded(
-              child: Align(
-            alignment: Alignment.centerRight,
-            child: Transform.scale(
-              scale: 0.8,
-              child: Icon(
-                  enabled ? Icons.check_box : Icons.check_box_outline_blank),
-            ),
-          ).marginOnly(right: 4)),
-        ],
-      ),
-      proc: () => peerFolderModel.setPreview(id, !enabled),
       padding: menuPadding,
       dismissOnClicked: true,
     );

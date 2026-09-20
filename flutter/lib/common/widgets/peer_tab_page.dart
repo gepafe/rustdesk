@@ -6,7 +6,6 @@ import 'package:flutter_hbb/common/widgets/address_book.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/my_group.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
-import 'package:flutter_hbb/common/widgets/preview_gallery.dart';
 import 'package:flutter_hbb/common/widgets/peer_card.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
@@ -570,15 +569,6 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Nueva carpeta'),
         child: Icon(Icons.create_new_folder_outlined, size: 18),
         onTap: () => showNewFolderDialog(),
-      ).marginOnly(right: 6),
-      _hoverAction(
-        context: context,
-        toolTip: translate('Vista previa'),
-        child: Icon(Icons.photo_library_outlined, size: 18),
-        onTap: () {
-          showPreviewGalleryDialog(context);
-          startPreviewCaptures();
-        },
       ).marginOnly(right: 6),
       Offstage(
         offstage: model.currentTabCachedPeers.isEmpty,
