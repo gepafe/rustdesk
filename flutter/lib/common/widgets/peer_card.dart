@@ -656,8 +656,8 @@ abstract class BasePeerCard extends StatelessWidget {
     );
   }
 
-  // ignore: unused_element
   @protected
+  // ignore: unused_element
   MenuEntryBase<String> _viewCameraAction(BuildContext context) {
     return _connectCommonAction(
       context,
