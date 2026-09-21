@@ -1490,9 +1490,15 @@ class FfiModel with ChangeNotifier {
               sessionId: sessionId, arg: kOptionToggleViewOnly));
       setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
-      // Si el equipo esta marcado como "Solo ver" (boton VER), arrancar la
-      // sesion en modo observador aunque el toggle tipado venga en falso.
-      if (bind.mainGetPeerOptionSync(id: peerId, key: kOptionViewOnly) == 'Y') {
+      // Los botones VER/CONTROLAR de la tarjeta guardan la preferencia en la
+      // opcion view_only del equipo. Se fuerza la sesion a ese estado: el
+      // toggle solo invierte, asi que sin esto CONTROLAR no quitaria el modo
+      // observador que dejo VER en la conexion anterior.
+      final wantViewOnly =
+          bind.mainGetPeerOptionSync(id: peerId, key: kOptionViewOnly) == 'Y';
+      if (wantViewOnly !=
+          bind.sessionGetToggleOptionSync(
+              sessionId: sessionId, arg: kOptionToggleViewOnly)) {
         bind.sessionToggleOption(
             sessionId: sessionId, value: kOptionToggleViewOnly);
       }

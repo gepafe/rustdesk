@@ -17,14 +17,17 @@ use hbb_common::{
 use base::message_proto::*;
 
 fn run_rdp(port: u16, name: &str) {
+    // mstsc reads the saved credential under the TERMSRV/ target, not the bare
+    // host name, so a plain "localhost" entry is never picked up and the user
+    // is asked for the password again.
     std::process::Command::new("cmdkey")
-        .arg("/delete:localhost")
+        .arg("/delete:TERMSRV/localhost")
         .output()
         .ok();
     let username = std::env::var("rdp_username").unwrap_or_default();
     let password = std::env::var("rdp_password").unwrap_or_default();
     if !username.is_empty() || !password.is_empty() {
-        let mut args = vec!["/generic:localhost".to_owned()];
+        let mut args = vec!["/generic:TERMSRV/localhost".to_owned()];
         if !username.is_empty() {
             args.push(format!("/user:{}", username));
         }
