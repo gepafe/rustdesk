@@ -233,6 +233,7 @@ class _PeerCardState extends State<_PeerCard>
                             )
                         ],
                       ),
+                      if (!isPortrait) _quickActions(context, peer),
                     ],
                   ).marginOnly(top: 2),
                 ),
