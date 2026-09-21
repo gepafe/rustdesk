@@ -2430,12 +2430,30 @@ void showWindowsSessionsDialog(
     names.add(session['name']);
   }
   String selectedUserValue = sids.first;
+  String selectedName() {
+    final i = sids.indexOf(selectedUserValue);
+    return i >= 0 && i < names.length ? names[i] : '';
+  }
+
+  void sendSelected() {
+    bind.sessionSendSelectedSessionId(
+        sessionId: sessionId, sid: selectedUserValue);
+  }
+
   dialogManager.dismissAll();
   dialogManager.show((setState, close, context) {
     submit() {
-      bind.sessionSendSelectedSessionId(
-          sessionId: sessionId, sid: selectedUserValue);
-      close();
+      // Las sesiones cuyo usuario empieza con "PC" entran sin clave; el resto
+      // pide la clave de acceso antes de conectar.
+      if (selectedName().toUpperCase().startsWith('PC')) {
+        sendSelected();
+        close();
+        return;
+      }
+      _askSessionPassword(dialogManager, () {
+        sendSelected();
+        close();
+      });
     }
 
     return CustomAlertDialog(
@@ -2455,6 +2473,53 @@ void showWindowsSessionsDialog(
       ),
       actions: [
         dialogButton('Connect', onPressed: submit, isOutline: false),
+      ],
+    );
+  });
+}
+
+const _kSessionUnlockKey = '777';
+
+void _askSessionPassword(
+    OverlayDialogManager dialogManager, VoidCallback onOk) {
+  final controller = TextEditingController();
+  String err = '';
+  dialogManager.show((setState, close, context) {
+    submit() {
+      if (controller.text.trim() == _kSessionUnlockKey) {
+        close();
+        onOk();
+      } else {
+        err = 'Clave incorrecta';
+        setState(() {});
+      }
+    }
+
+    return CustomAlertDialog(
+      title: null,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          msgboxContent('', 'Sesion protegida',
+                  'Escribe la clave para entrar a esta sesion')
+              .marginOnly(bottom: 12),
+          TextField(
+            controller: controller,
+            obscureText: true,
+            autofocus: true,
+            onSubmitted: (_) => submit(),
+            decoration: const InputDecoration(
+              labelText: 'Clave',
+              border: OutlineInputBorder(),
+            ),
+          ).marginOnly(bottom: 8),
+          if (err.isNotEmpty)
+            Text(err, style: const TextStyle(color: Colors.red, fontSize: 12)),
+        ],
+      ),
+      actions: [
+        dialogButton('Cancelar', onPressed: close, isOutline: true),
+        dialogButton('Entrar', onPressed: submit, isOutline: false),
       ],
     );
   });
