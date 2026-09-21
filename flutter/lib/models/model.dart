@@ -880,6 +880,21 @@ class FfiModel with ChangeNotifier {
     if (parent.target == null) return;
     final dialogManager = parent.target!.dialogManager;
     final sessions = evt['windows_sessions'];
+    // Guardar los nombres de las sesiones Windows activas del equipo, para
+    // mostrarlos en su tarjeta aunque no haya una sesion abierta.
+    try {
+      final decoded = json.decode(sessions ?? '[]');
+      if (decoded is List) {
+        final names = decoded
+            .map((e) => (e is Map ? (e['name'] ?? '') : '').toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (names.isNotEmpty) {
+          bind.mainSetLocalOption(
+              key: 'windows-sessions-$peerId', value: names.join(', '));
+        }
+      }
+    } catch (_) {}
     final title = translate('Multiple Windows sessions found');
     final text = translate('Please select the session you want to connect to');
     final type = "";
@@ -1475,6 +1490,12 @@ class FfiModel with ChangeNotifier {
               sessionId: sessionId, arg: kOptionToggleViewOnly));
       setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
+      // Si el equipo esta marcado como "Solo ver" (boton VER), arrancar la
+      // sesion en modo observador aunque el toggle tipado venga en falso.
+      if (bind.mainGetPeerOptionSync(id: peerId, key: kOptionViewOnly) == 'Y') {
+        bind.sessionToggleOption(
+            sessionId: sessionId, value: kOptionToggleViewOnly);
+      }
     }
     if (connType == ConnType.defaultConn || connType == ConnType.viewCamera) {
       final platformAdditions = evt['platform_additions'];

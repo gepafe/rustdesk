@@ -31,12 +31,14 @@ class _PeerCard extends StatefulWidget {
   final PeerTabIndex tab;
   final Function(BuildContext, String) connect;
   final PopupMenuEntryBuilder popupMenuEntryBuilder;
+  final VoidCallback? rdpConfig;
 
   const _PeerCard(
       {required this.peer,
       required this.tab,
       required this.connect,
       required this.popupMenuEntryBuilder,
+      this.rdpConfig,
       Key? key})
       : super(key: key);
 
@@ -332,9 +334,17 @@ class _PeerCardState extends State<_PeerCard>
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
-                              if (_showNote(peer))
+                                 ],
+                               ),
+                               if (_cachedWindowsSessions(peer.id).isNotEmpty)
+                                 Text(
+                                   'Sesiones: ${_cachedWindowsSessions(peer.id)}',
+                                   style: const TextStyle(
+                                       color: Colors.white70, fontSize: 10),
+                                   textAlign: TextAlign.center,
+                                   overflow: TextOverflow.ellipsis,
+                                 ),
+                               if (_showNote(peer))
                                 Row(
                                   children: [
                                     Expanded(
@@ -377,7 +387,8 @@ class _PeerCardState extends State<_PeerCard>
                       checkBoxOrActionMoreLandscape(peer, isTile: false),
                     ],
                   ).paddingSymmetric(horizontal: 12.0),
-                )
+                ),
+                _quickActions(context, peer),
               ],
             ),
           ),
@@ -474,6 +485,57 @@ class _PeerCardState extends State<_PeerCard>
     }
   }
 
+  // Accesos rapidos: VER (solo ver), CONTROLAR, RDP y RDP GUARDADO.
+  Widget _quickAction(BuildContext context, String label, VoidCallback onTap) {
+    final color = Theme.of(context).colorScheme.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withOpacity(0.6)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(label,
+            style: TextStyle(fontSize: 10, color: color),
+            overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+
+  String _cachedWindowsSessions(String id) {
+    try {
+      return bind.mainGetLocalOption(key: 'windows-sessions-$id');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _quickActions(BuildContext context, Peer peer) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _quickAction(context, 'VER', () async {
+          await bind.mainSetPeerOption(
+              id: peer.id, key: kOptionViewOnly, value: 'Y');
+          connectInPeerTab(context, peer, widget.tab);
+        }),
+        _quickAction(context, 'CONTROLAR', () async {
+          await bind.mainSetPeerOption(
+              id: peer.id, key: kOptionViewOnly, value: '');
+          connectInPeerTab(context, peer, widget.tab);
+        }),
+        _quickAction(context, 'RDP', () {
+          widget.rdpConfig?.call();
+        }),
+        _quickAction(context, 'RDP GUARDADO', () {
+          connectInPeerTab(context, peer, widget.tab, isRDP: true);
+        }),
+      ],
+    );
+  }
+
   Widget _actionMore(Peer peer) => Listener(
       onPointerDown: (e) {
         final x = e.position.dx;
@@ -521,6 +583,7 @@ abstract class BasePeerCard extends StatelessWidget {
       connect: (BuildContext context, String id) =>
           connectInPeerTab(context, peer, tab),
       popupMenuEntryBuilder: _buildPopupMenuEntry,
+      rdpConfig: () => _rdpDialog(peer.id),
     );
   }
 
@@ -593,6 +656,7 @@ abstract class BasePeerCard extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   @protected
   MenuEntryBase<String> _viewCameraAction(BuildContext context) {
     return _connectCommonAction(
