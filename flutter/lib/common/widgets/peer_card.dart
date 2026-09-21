@@ -233,7 +233,6 @@ class _PeerCardState extends State<_PeerCard>
                             )
                         ],
                       ),
-                      if (!isPortrait) _quickActions(context, peer),
                     ],
                   ).marginOnly(top: 2),
                 ),
@@ -389,7 +388,6 @@ class _PeerCardState extends State<_PeerCard>
                     ],
                   ).paddingSymmetric(horizontal: 12.0),
                 ),
-                _quickActions(context, peer),
               ],
             ),
           ),
@@ -486,55 +484,12 @@ class _PeerCardState extends State<_PeerCard>
     }
   }
 
-  // Accesos rapidos: VER (solo ver), CONTROLAR, RDP y RDP GUARDADO.
-  Widget _quickAction(BuildContext context, String label, VoidCallback onTap) {
-    final color = Theme.of(context).colorScheme.primary;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-        decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.6)),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(label,
-            style: TextStyle(fontSize: 10, color: color),
-            overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
-
   String _cachedWindowsSessions(String id) {
     try {
       return bind.mainGetLocalOption(key: 'windows-sessions-$id');
     } catch (_) {
       return '';
     }
-  }
-
-  Widget _quickActions(BuildContext context, Peer peer) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _quickAction(context, 'VER', () async {
-          await bind.mainSetPeerOption(
-              id: peer.id, key: kOptionViewOnly, value: 'Y');
-          connectInPeerTab(context, peer, widget.tab);
-        }),
-        _quickAction(context, 'CONTROLAR', () async {
-          await bind.mainSetPeerOption(
-              id: peer.id, key: kOptionViewOnly, value: '');
-          connectInPeerTab(context, peer, widget.tab);
-        }),
-        _quickAction(context, 'RDP', () {
-          widget.rdpConfig?.call();
-        }),
-        _quickAction(context, 'RDP GUARDADO', () {
-          connectInPeerTab(context, peer, widget.tab, isRDP: true);
-        }),
-      ],
-    );
   }
 
   Widget _actionMore(Peer peer) => Listener(
@@ -590,7 +545,11 @@ abstract class BasePeerCard extends StatelessWidget {
 
   Future<List<mod_menu.PopupMenuEntry<String>>> _buildPopupMenuEntry(
           BuildContext context) async =>
-      (await _buildMenuItems(context))
+      <MenuEntryBase<String>>[
+        ..._quickMenuItems(context),
+        MenuEntryDivider(),
+        ...await _buildMenuItems(context),
+      ]
           .map((e) => e.build(
               context,
               const MenuConfig(
@@ -599,6 +558,39 @@ abstract class BasePeerCard extends StatelessWidget {
                   dividerHeight: CustomPopupMenuTheme.dividerHeight)))
           .expand((i) => i)
           .toList();
+
+  // Accesos rapidos como primeras opciones del menu de los 3 puntos.
+  List<MenuEntryBase<String>> _quickMenuItems(BuildContext context) => [
+        MenuEntryButton<String>(
+          childBuilder: (TextStyle? style) => Text('VER', style: style),
+          proc: () async {
+            await bind.mainSetPeerOption(
+                id: peer.id, key: kOptionViewOnly, value: 'Y');
+            connectInPeerTab(context, peer, tab);
+          },
+          dismissOnClicked: true,
+        ),
+        MenuEntryButton<String>(
+          childBuilder: (TextStyle? style) => Text('CONTROLAR', style: style),
+          proc: () async {
+            await bind.mainSetPeerOption(
+                id: peer.id, key: kOptionViewOnly, value: '');
+            connectInPeerTab(context, peer, tab);
+          },
+          dismissOnClicked: true,
+        ),
+        MenuEntryButton<String>(
+          childBuilder: (TextStyle? style) => Text('RDP', style: style),
+          proc: () => _rdpDialog(peer.id),
+          dismissOnClicked: true,
+        ),
+        MenuEntryButton<String>(
+          childBuilder: (TextStyle? style) =>
+              Text('RDP GUARDADO', style: style),
+          proc: () => connectInPeerTab(context, peer, tab, isRDP: true),
+          dismissOnClicked: true,
+        ),
+      ];
 
   @protected
   Future<List<MenuEntryBase<String>>> _buildMenuItems(BuildContext context);
