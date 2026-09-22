@@ -643,7 +643,13 @@ class _PeerTabPageState extends State<PeerTabPage>
     final List<Widget> dynamicActions = [
       if (model.currentTabCachedPeers.isNotEmpty) _createMultiSelection(),
       if (model.currentTab != PeerTabIndex.recent.index) PeerSortDropdown(),
-      if (model.currentTab == PeerTabIndex.ab.index) _toggleTags()
+      if (model.currentTab == PeerTabIndex.ab.index) _toggleTags(),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Importar equipos'),
+        child: Icon(Icons.playlist_add_rounded, size: 18),
+        onTap: () => showImportPeersBulkDialog(),
+      )
     ];
     final rightWidth = availableWidth -
         searchWidth -
