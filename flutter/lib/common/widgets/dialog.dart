@@ -2440,6 +2440,14 @@ void showWindowsSessionsDialog(
         sessionId: sessionId, sid: selectedUserValue);
   }
 
+  // Con una sola sesion "PC..." no hace falta molestar con el dialogo: se
+  // conecta directo. El resto si pasa por el dialogo (y la clave 777).
+  if (names.length == 1 && names.first.toUpperCase().startsWith('PC')) {
+    dialogManager.dismissAll();
+    sendSelected();
+    return;
+  }
+
   dialogManager.dismissAll();
   dialogManager.show((setState, close, context) {
     submit() {

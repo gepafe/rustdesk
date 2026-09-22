@@ -2254,7 +2254,11 @@ impl Connection {
             if crate::platform::is_installed()
                 && crate::platform::is_share_rdp()
                 && raii::AuthedConnID::non_port_forward_conn_count() == 1
-                && sessions.len() > 1
+                // Cliente personalizado: en escritorio remoto se manda la lista
+                // aunque haya una sola sesion, para que la app pueda pedir la
+                // clave 777 de esa sesion. En transferencia/camara no se cambia.
+                && !sessions.is_empty()
+                && (sessions.len() > 1 || self.is_remote())
                 && sessions.iter().any(|e| e.sid == current_sid)
                 && get_version_number(&self.lr.version) >= get_version_number("1.2.4")
             {
