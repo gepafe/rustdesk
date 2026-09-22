@@ -134,6 +134,55 @@ class _PeerCardState extends State<_PeerCard>
     return peerTabShowNote(widget.tab) && peer.note.isNotEmpty;
   }
 
+  Widget _listRow(Peer peer, String name, TextStyle greyStyle) {
+    final sessions = _cachedWindowsSessions(peer.id);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.background,
+        borderRadius: BorderRadius.circular(_tileRadius),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          getOnline(6, peer.online),
+          const SizedBox(width: 8),
+          getPlatformImage(peer.platform, size: 18),
+          const SizedBox(width: 10),
+          Text(
+            peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
+            style: Theme.of(context).textTheme.titleSmall,
+            maxLines: 1,
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                if (name.isNotEmpty)
+                  Flexible(
+                    child: Text(
+                      name,
+                      style: greyStyle,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ).marginOnly(left: 12),
+                  ),
+                if (sessions.isNotEmpty)
+                  Flexible(
+                    child: Text(
+                      'Sesiones: $sessions',
+                      style: greyStyle,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ).marginOnly(left: 12),
+                  ),
+              ],
+            ),
+          ),
+          checkBoxOrActionMoreLandscape(peer, isTile: true),
+        ],
+      ),
+    );
+  }
+
   makeChild(bool isPortrait, Peer peer) {
     final name = hideUsernameOnCard == true
         ? peer.hostname
@@ -142,6 +191,12 @@ class _PeerCardState extends State<_PeerCard>
         fontSize: 11,
         color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
     final showNote = _showNote(peer);
+
+    // Vista de lista: una sola linea por equipo (mas compacta) e incluye las
+    // sesiones de Windows activas, que antes solo se veian en la vista grande.
+    if (!isPortrait && peerCardUiType.value == PeerUiType.list) {
+      return _listRow(peer, name, greyStyle);
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.max,
