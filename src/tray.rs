@@ -10,11 +10,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub fn start_tray() {
-    // Cliente personalizado (modo incognito en Windows): no mostrar la bandeja,
-    // para que no quede rastro de la sesion (el tooltip muestra "N sessions").
-    if cfg!(target_os = "windows")
-        || crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y"
-    {
+    // Cliente personalizado: la bandeja se muestra (asi siempre se puede reabrir
+    // la ventana) y se oculta sola solo mientras una sesion te esta controlando,
+    // para no dejar rastro en la PC que es accedida (ver ControlledSessionCount).
+    if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
         #[cfg(not(target_os = "macos"))]
         {
             return;
@@ -254,11 +253,11 @@ fn make_tray() -> hbb_common::ResultType<()> {
         if let Ok(data) = ipc_receiver.try_recv() {
             match data {
                 Data::ControlledSessionCount(count) => {
-                    _tray_icon
-                        .lock()
-                        .unwrap()
-                        .as_mut()
-                        .map(|t| t.set_tooltip(Some(tooltip(count))));
+                    // Cliente personalizado: sin icono mientras te controlan.
+                    _tray_icon.lock().unwrap().as_mut().map(|t| {
+                        t.set_tooltip(Some(tooltip(count)));
+                        t.set_visible(count == 0);
+                    });
                 }
                 _ => {}
             }

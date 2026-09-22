@@ -5,6 +5,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Cliente personalizado: bloqueo con PIN al abrir la aplicación.
 ///
@@ -112,6 +113,28 @@ class _PinLockGateState extends State<PinLockGate> {
     _correctPin = getAppLockPin();
     // Si no hay PIN configurado, no se bloquea la aplicación.
     _unlocked = _correctPin.isEmpty;
+    if (!_unlocked) {
+      _bringToFront();
+    }
+  }
+
+  // Cliente personalizado: el bloqueo es una pantalla dentro de la ventana, así
+  // que si la ventana quedó oculta o detrás el PIN no se ve. La forzamos al
+  // frente mientras está bloqueada y la soltamos al desbloquear.
+  void _bringToFront() {
+    if (!isDesktop) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+        await windowManager.setAlwaysOnTop(true);
+      } catch (_) {}
+    });
+  }
+
+  void _releaseForeground() {
+    if (!isDesktop) return;
+    windowManager.setAlwaysOnTop(false);
   }
 
   @override
@@ -122,6 +145,7 @@ class _PinLockGateState extends State<PinLockGate> {
 
   void _submit() {
     if (_controller.text.trim() == _correctPin) {
+      _releaseForeground();
       setState(() {
         _unlocked = true;
         _error = null;
