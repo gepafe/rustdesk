@@ -1378,6 +1378,12 @@ pub fn main_set_peer_flutter_option_sync(id: String, k: String, v: String) -> Sy
 }
 
 pub fn main_set_peer_option(id: String, key: String, value: String) {
+    // Cliente personalizado: las claves "rdp_tmp_*" son credenciales RDP de una
+    // sola conexion; no se persisten, las consume io_loop al conectar.
+    if let Some(k) = key.strip_prefix("rdp_tmp_") {
+        crate::ui_session_interface::set_rdp_tmp(k.to_owned(), value);
+        return;
+    }
     set_peer_option(id, key, value)
 }
 

@@ -1939,6 +1939,34 @@ impl<T: InvokeUiSession> Session<T> {
     }
 }
 
+lazy_static::lazy_static! {
+    // Credenciales RDP de una sola conexion (no se persisten): la app las carga
+    // antes de conectar y el bloque RDP de io_loop las consume una vez.
+    static ref RDP_TMP: Mutex<Option<[String; 3]>> = Mutex::new(None);
+}
+
+// key: "port" | "username" | "password"
+pub fn set_rdp_tmp(key: String, value: String) {
+    let idx = match key.as_str() {
+        "port" => 0,
+        "username" => 1,
+        "password" => 2,
+        _ => return,
+    };
+    let mut tmp = RDP_TMP.lock().unwrap();
+    if tmp.is_none() {
+        *tmp = Some([String::new(), String::new(), String::new()]);
+    }
+    if let Some(v) = tmp.as_mut() {
+        v[idx] = value;
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn take_rdp_tmp() -> Option<[String; 3]> {
+    RDP_TMP.lock().unwrap().take()
+}
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -1952,17 +1980,27 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     if handler.is_port_forward() {
         handler.lc.write().unwrap().port_forward_mux = crate::port_forward::mux_enabled();
         if handler.is_rdp() {
-            let port = handler
-                .get_option("rdp_port".to_owned())
+            // Si la app mando credenciales para esta conexion, se usan esas y no
+            // las guardadas del equipo.
+            let tmp = take_rdp_tmp();
+            let port = tmp
+                .as_ref()
+                .map(|v| v[0].clone())
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| handler.get_option("rdp_port".to_owned()))
                 .parse::<i32>()
                 .unwrap_or(3389);
             std::env::set_var(
                 "rdp_username",
-                handler.get_option("rdp_username".to_owned()),
+                tmp.as_ref()
+                    .map(|v| v[1].clone())
+                    .unwrap_or_else(|| handler.get_option("rdp_username".to_owned())),
             );
             std::env::set_var(
                 "rdp_password",
-                handler.get_option("rdp_password".to_owned()),
+                tmp.as_ref()
+                    .map(|v| v[2].clone())
+                    .unwrap_or_else(|| handler.get_option("rdp_password".to_owned())),
             );
             log::info!("Remote rdp port: {}", port);
             start_one_port_forward(handler, 0, "".to_owned(), port, receiver, &key, &token).await;

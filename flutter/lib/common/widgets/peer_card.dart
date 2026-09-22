@@ -636,13 +636,42 @@ abstract class BasePeerCard extends StatelessWidget {
         ),
         MenuEntryButton<String>(
           childBuilder: (TextStyle? style) => Text('RDP', style: style),
-          proc: () => _rdpDialog(peer.id),
+          proc: () => _rdpDialog(
+            peer.id,
+            save: false,
+            onDone: (port, username, password) {
+              // Credenciales de una sola conexion: no se guardan.
+              bind.mainSetPeerOption(
+                  id: peer.id, key: 'rdp_tmp_port', value: port);
+              bind.mainSetPeerOption(
+                  id: peer.id, key: 'rdp_tmp_username', value: username);
+              bind.mainSetPeerOption(
+                  id: peer.id, key: 'rdp_tmp_password', value: password);
+              connectInPeerTab(context, peer, tab, isRDP: true);
+            },
+          ),
           dismissOnClicked: true,
         ),
         MenuEntryButton<String>(
           childBuilder: (TextStyle? style) =>
               Text('RDP GUARDADO', style: style),
-          proc: () => connectInPeerTab(context, peer, tab, isRDP: true),
+          proc: () async {
+            // Conexion RDP frecuente: si ya hay credenciales guardadas conecta
+            // directo; si no, las pide una vez y las guarda.
+            final username =
+                await bind.mainGetPeerOption(id: peer.id, key: 'rdp_username');
+            final password =
+                await bind.mainGetPeerOption(id: peer.id, key: 'rdp_password');
+            if (username.isNotEmpty || password.isNotEmpty) {
+              connectInPeerTab(context, peer, tab, isRDP: true);
+              return;
+            }
+            _rdpDialog(
+              peer.id,
+              onDone: (port, user, password) =>
+                  connectInPeerTab(context, peer, tab, isRDP: true),
+            );
+          },
           dismissOnClicked: true,
         ),
       ];
@@ -1541,7 +1570,9 @@ class MyGroupPeerCard extends BasePeerCard {
   void _update() => gFFI.groupModel.pull();
 }
 
-void _rdpDialog(String id) async {
+void _rdpDialog(String id,
+    {bool save = true,
+    void Function(String port, String username, String password)? onDone}) async {
   final maxLength = bind.mainMaxEncryptLen();
   final port = await bind.mainGetPeerOption(id: id, key: 'rdp_port');
   final username = await bind.mainGetPeerOption(id: id, key: 'rdp_username');
@@ -1556,13 +1587,16 @@ void _rdpDialog(String id) async {
       String port = portController.text.trim();
       String username = userController.text;
       String password = passwordController.text;
-      await bind.mainSetPeerOption(id: id, key: 'rdp_port', value: port);
-      await bind.mainSetPeerOption(
-          id: id, key: 'rdp_username', value: username);
-      await bind.mainSetPeerOption(
-          id: id, key: 'rdp_password', value: password);
-      showToast(translate('Successful'));
+      if (save) {
+        await bind.mainSetPeerOption(id: id, key: 'rdp_port', value: port);
+        await bind.mainSetPeerOption(
+            id: id, key: 'rdp_username', value: username);
+        await bind.mainSetPeerOption(
+            id: id, key: 'rdp_password', value: password);
+        showToast(translate('Successful'));
+      }
       close();
+      onDone?.call(port, username, password);
     }
 
     return CustomAlertDialog(
