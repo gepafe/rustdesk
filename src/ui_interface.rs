@@ -793,6 +793,12 @@ pub fn create_shortcut(_id: String) {
     crate::platform::windows::create_shortcut(&_id).ok();
 }
 
+#[cfg(windows)]
+#[inline]
+pub fn create_rdp_shortcut(_id: String) {
+    crate::platform::windows::create_rdp_shortcut(&_id).ok();
+}
+
 #[cfg(any(target_os = "android", target_os = "ios", feature = "flutter"))]
 #[inline]
 pub fn discover() {

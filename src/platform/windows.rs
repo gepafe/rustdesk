@@ -2292,6 +2292,45 @@ oLink.Save
     Ok(())
 }
 
+/// Acceso directo en el escritorio que abre la conexion RDP del equipo.
+pub fn create_rdp_shortcut(id: &str) -> ResultType<()> {
+    if !crate::common::is_valid_untrusted_peer_id(id) {
+        bail!("Invalid peer id for shortcut");
+    }
+
+    let exe = std::env::current_exe()?.to_str().unwrap_or("").to_owned();
+    // https://github.com/rustdesk/rustdesk/issues/13735
+    // Replace ':' with '_' for filename since ':' is not allowed in Windows filenames
+    // https://github.com/rustdesk/hbb_common/blob/8b0e25867375ba9e6bff548acf44fe6d6ffa7c0e/src/config.rs#L1384
+    let filename = format!("{}_rdp", id.replace(':', "_"));
+    let shortcut_icon_location = get_shortcut_icon_location("", &exe);
+    let shortcut = write_vbs(
+        format!(
+            "
+Set oWS = WScript.CreateObject(\"WScript.Shell\")
+strDesktop = oWS.SpecialFolders(\"Desktop\")
+Set objFSO = CreateObject(\"Scripting.FileSystemObject\")
+sLinkFile = objFSO.BuildPath(strDesktop, \"{filename}.lnk\")
+Set oLink = oWS.CreateShortcut(sLinkFile)
+    oLink.TargetPath = \"{exe}\"
+    oLink.Arguments = \"--rdp {id}\"
+    {shortcut_icon_location}
+oLink.Save
+        "
+        ),
+        "connect_rdp_shortcut",
+    )?
+    .to_str()
+    .unwrap_or("")
+    .to_owned();
+    std::process::Command::new("cscript")
+        .arg(&shortcut)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()?;
+    allow_err!(std::fs::remove_file(shortcut));
+    Ok(())
+}
+
 pub fn enable_lowlevel_keyboard(hwnd: HWND) {
     let ret = unsafe { win32_enable_lowlevel_keyboard(hwnd) };
     if ret != 0 {

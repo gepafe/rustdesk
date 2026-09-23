@@ -2192,6 +2192,11 @@ pub fn main_create_shortcut(_id: String) {
     create_shortcut(_id);
 }
 
+pub fn main_create_rdp_shortcut(_id: String) {
+    #[cfg(windows)]
+    create_rdp_shortcut(_id);
+}
+
 pub fn cm_send_chat(conn_id: i32, msg: String) {
     #[cfg(not(any(target_os = "ios")))]
     crate::ui_cm_interface::send_chat(conn_id, msg);
