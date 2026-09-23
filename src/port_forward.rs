@@ -16,28 +16,45 @@ use hbb_common::{
 };
 use base::message_proto::*;
 
+// mstsc consulta la credencial bajo "TERMSRV/" + el mismo servidor que se le
+// pasa a /v, por lo que con un puerto explicito el destino tambien lo lleva.
+fn rdp_cred_targets(port: u16) -> [String; 2] {
+    [
+        "TERMSRV/localhost".to_owned(),
+        format!("TERMSRV/localhost:{}", port),
+    ]
+}
+
+fn clear_rdp_credentials(port: u16) {
+    for target in rdp_cred_targets(port) {
+        std::process::Command::new("cmdkey")
+            .arg(format!("/delete:{}", target))
+            .output()
+            .ok();
+    }
+}
+
 fn run_rdp(port: u16, name: &str) {
     // mstsc reads the saved credential under the TERMSRV/ target, not the bare
     // host name, so a plain "localhost" entry is never picked up and the user
     // is asked for the password again.
-    std::process::Command::new("cmdkey")
-        .arg("/delete:TERMSRV/localhost")
-        .output()
-        .ok();
+    clear_rdp_credentials(port);
     let username = std::env::var("rdp_username").unwrap_or_default();
     let password = std::env::var("rdp_password").unwrap_or_default();
     if !username.is_empty() || !password.is_empty() {
-        let mut args = vec!["/generic:TERMSRV/localhost".to_owned()];
-        if !username.is_empty() {
-            args.push(format!("/user:{}", username));
+        for target in rdp_cred_targets(port) {
+            let mut args = vec![format!("/generic:{}", target)];
+            if !username.is_empty() {
+                args.push(format!("/user:{}", username));
+            }
+            if !password.is_empty() {
+                args.push(format!("/pass:{}", password));
+            }
+            std::process::Command::new("cmdkey")
+                .args(&args)
+                .output()
+                .ok();
         }
-        if !password.is_empty() {
-            args.push(format!("/pass:{}", password));
-        }
-        std::process::Command::new("cmdkey")
-            .args(&args)
-            .output()
-            .ok();
     }
     // Keep using /v instead of a generated .rdp file: mstsc then preserves the
     // user's Default.rdp settings and avoids unsigned-file warnings or policies.
@@ -162,6 +179,7 @@ pub async fn listen(
                 }
             }
             _ = rdp_done_rx.recv() => {
+                clear_rdp_credentials(addr.port());
                 break;
             }
         }

@@ -2,6 +2,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
+import 'package:flutter_hbb/common/widgets/telegram_monitor.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -647,13 +648,13 @@ abstract class BasePeerCard extends StatelessWidget {
           proc: () => _rdpDialog(
             peer.id,
             save: false,
-            onDone: (port, username, password) {
+            onDone: (port, username, password) async {
               // Credenciales de una sola conexion: no se guardan.
-              bind.mainSetPeerOption(
+              await bind.mainSetPeerOption(
                   id: peer.id, key: 'rdp_tmp_port', value: port);
-              bind.mainSetPeerOption(
+              await bind.mainSetPeerOption(
                   id: peer.id, key: 'rdp_tmp_username', value: username);
-              bind.mainSetPeerOption(
+              await bind.mainSetPeerOption(
                   id: peer.id, key: 'rdp_tmp_password', value: password);
               connectInPeerTab(context, peer, tab, isRDP: true);
             },
@@ -661,8 +662,30 @@ abstract class BasePeerCard extends StatelessWidget {
           dismissOnClicked: true,
         ),
         MenuEntryButton<String>(
-          childBuilder: (TextStyle? style) =>
-              Text('RDP GUARDADO', style: style),
+          childBuilder: (TextStyle? style) => Container(
+              alignment: AlignmentDirectional.center,
+              height: CustomPopupMenuTheme.height,
+              child: Row(
+                children: [
+                  Text('RDP GUARDADO', style: style),
+                  Expanded(
+                      child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Transform.scale(
+                        scale: 0.8,
+                        child: IconButton(
+                          icon: const Icon(Icons.edit),
+                          padding: EdgeInsets.zero,
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            }
+                            _rdpDialog(peer.id);
+                          },
+                        )),
+                  ))
+                ],
+              )),
           proc: () async {
             // Conexion RDP frecuente: si ya hay credenciales guardadas conecta
             // directo; si no, las pide una vez y las guarda.
@@ -682,6 +705,16 @@ abstract class BasePeerCard extends StatelessWidget {
           },
           dismissOnClicked: true,
         ),
+        if (isWindows)
+          MenuEntryButton<String>(
+            childBuilder: (TextStyle? style) => Text(
+                '${isTelegramMonitored(peer.id) ? "☑" : "☐"} Monitoreo Telegram',
+                style: style),
+            proc: () => toggleTelegramMonitor(
+                peer.id, !isTelegramMonitored(peer.id),
+                label: peer.alias.isEmpty ? formatID(peer.id) : peer.alias),
+            dismissOnClicked: true,
+          ),
       ];
 
   @protected
@@ -775,44 +808,6 @@ abstract class BasePeerCard extends StatelessWidget {
       context,
       translate('TCP tunneling'),
       isTcpTunneling: true,
-    );
-  }
-
-  @protected
-  MenuEntryBase<String> _rdpAction(BuildContext context, String id) {
-    return MenuEntryButton<String>(
-      childBuilder: (TextStyle? style) => Container(
-          alignment: AlignmentDirectional.center,
-          height: CustomPopupMenuTheme.height,
-          child: Row(
-            children: [
-              Text(
-                translate('RDP'),
-                style: style,
-              ),
-              Expanded(
-                  child: Align(
-                alignment: Alignment.centerRight,
-                child: Transform.scale(
-                    scale: 0.8,
-                    child: IconButton(
-                      icon: const Icon(Icons.edit),
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                        _rdpDialog(id);
-                      },
-                    )),
-              ))
-            ],
-          )),
-      proc: () {
-        connectInPeerTab(context, peer, tab, isRDP: true);
-      },
-      padding: menuPadding,
-      dismissOnClicked: true,
     );
   }
 
@@ -1135,9 +1130,6 @@ class RecentPeerCard extends BasePeerCard {
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
-    }
     if (isWindows) {
       menuItems.add(_createShortCutAction(peer.id));
     }
@@ -1283,9 +1275,6 @@ class FavoritePeerCard extends BasePeerCard {
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
-    }
     if (isWindows) {
       menuItems.add(_createShortCutAction(peer.id));
     }
@@ -1344,9 +1333,6 @@ class DiscoveredPeerCard extends BasePeerCard {
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
-    }
     menuItems.add(_wolAction(peer.id));
     if (isWindows) {
       menuItems.add(_createShortCutAction(peer.id));
@@ -1399,9 +1385,6 @@ class AddressBookPeerCard extends BasePeerCard {
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
-    }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
     }
     if (isWindows) {
       menuItems.add(_createShortCutAction(peer.id));
@@ -1555,9 +1538,6 @@ class MyGroupPeerCard extends BasePeerCard {
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
-    }
-    if (isWindows && peer.platform == kPeerPlatformWindows) {
-      menuItems.add(_rdpAction(context, peer.id));
     }
     if (isWindows) {
       menuItems.add(_createShortCutAction(peer.id));
