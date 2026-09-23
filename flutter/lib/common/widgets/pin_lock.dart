@@ -160,51 +160,58 @@ class _PinLockGateState extends State<PinLockGate> {
   @override
   Widget build(BuildContext context) {
     if (_unlocked) return widget.child;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.lock_outline, size: 56),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Introduce el PIN para abrir',
-                    style: Theme.of(context).textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    obscureText: true,
-                    maxLength: bind.mainMaxEncryptLen(),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'PIN',
-                      errorText: _error,
-                      border: const OutlineInputBorder(),
+    // El bloqueo se dibuja ENCIMA de la app (no la reemplaza) para que los
+    // pedidos de conexion sigan funcionando con la app bloqueada y aparezcan al
+    // desbloquear.
+    return Stack(children: [
+      Positioned.fill(child: IgnorePointer(child: widget.child)),
+      Positioned.fill(
+          child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 56),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Introduce el PIN para abrir',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      child: const Text('Desbloquear'),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      obscureText: true,
+                      maxLength: bind.mainMaxEncryptLen(),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        labelText: 'PIN',
+                        errorText: _error,
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _submit,
+                        child: const Text('Desbloquear'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      )),
+    ]);
   }
 }

@@ -2254,6 +2254,32 @@ fn get_shortcut_icon_location(install_dir: &str, exe: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Nombre de archivo del acceso directo: usa el nombre (alias) del equipo si
+/// esta definido, si no el id.
+fn shortcut_file_name(id: &str) -> String {
+    let failed = || id.replace(':', "_");
+    let alias = crate::ui_interface::get_peer_option(id.to_owned(), "alias".to_owned());
+    let alias = alias.trim();
+    if alias.is_empty() {
+        return failed();
+    }
+    let name: String = alias
+        .chars()
+        .map(|c| {
+            if r#"\/:*?"<>|"#.contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let name = name.trim_matches(|c: char| c == '.' || c == ' ');
+    if name.is_empty() {
+        return failed();
+    }
+    name.to_owned()
+}
+
 pub fn create_shortcut(id: &str) -> ResultType<()> {
     if !crate::common::is_valid_untrusted_peer_id(id) {
         bail!("Invalid peer id for shortcut");
@@ -2263,7 +2289,7 @@ pub fn create_shortcut(id: &str) -> ResultType<()> {
     // https://github.com/rustdesk/rustdesk/issues/13735
     // Replace ':' with '_' for filename since ':' is not allowed in Windows filenames
     // https://github.com/rustdesk/hbb_common/blob/8b0e25867375ba9e6bff548acf44fe6d6ffa7c0e/src/config.rs#L1384
-    let filename = id.replace(':', "_");
+    let filename = shortcut_file_name(id);
     let shortcut_icon_location = get_shortcut_icon_location("", &exe);
     let shortcut = write_vbs(
         format!(
@@ -2302,7 +2328,7 @@ pub fn create_rdp_shortcut(id: &str) -> ResultType<()> {
     // https://github.com/rustdesk/rustdesk/issues/13735
     // Replace ':' with '_' for filename since ':' is not allowed in Windows filenames
     // https://github.com/rustdesk/hbb_common/blob/8b0e25867375ba9e6bff548acf44fe6d6ffa7c0e/src/config.rs#L1384
-    let filename = format!("{}_rdp", id.replace(':', "_"));
+    let filename = format!("{}_rdp", shortcut_file_name(id));
     let shortcut_icon_location = get_shortcut_icon_location("", &exe);
     let shortcut = write_vbs(
         format!(
