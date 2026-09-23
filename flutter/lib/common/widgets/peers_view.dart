@@ -19,6 +19,7 @@ import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import 'peer_card.dart';
 import 'peer_info_probe.dart';
+import 'telegram_monitor.dart';
 
 typedef PeerFilter = bool Function(Peer peer);
 typedef PeerCardBuilder = Widget Function(Peer peer);
@@ -427,7 +428,10 @@ class _PeersViewState extends State<_PeersView>
       bind.queryOnlines(ids: _curPeers.toList(growable: false));
       _queryCount = 0;
       // Primer chequeo automatico al abrir la app.
-      if (isLoadEvent) probePeersInfoOnStart();
+        if (isLoadEvent) {
+          probePeersInfoOnStart();
+          startTelegramMonitor();
+        }
     }
     _lastQueryPeers = {..._curPeers};
     if (isLoadEvent) {

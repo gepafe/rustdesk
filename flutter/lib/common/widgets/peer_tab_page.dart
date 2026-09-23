@@ -4,6 +4,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/address_book.dart';
 import 'package:flutter_hbb/common/widgets/peer_info_probe.dart';
+import 'package:flutter_hbb/common/widgets/telegram_monitor.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/my_group.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
@@ -589,6 +590,13 @@ class _PeerTabPageState extends State<PeerTabPage>
         child: Icon(Icons.create_new_folder_outlined, size: 18),
         onTap: () => showNewFolderDialog(),
       ).marginOnly(right: 6),
+      if (isWindows)
+        _hoverAction(
+          context: context,
+          toolTip: 'Alertas Telegram',
+          child: Icon(Icons.notifications_active_outlined, size: 18),
+          onTap: () => showTelegramConfigDialog(),
+        ).marginOnly(right: 6),
       Offstage(
         offstage: model.currentTabCachedPeers.isEmpty,
         child: _createMultiSelection(),
