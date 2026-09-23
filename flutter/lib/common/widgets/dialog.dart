@@ -2409,6 +2409,20 @@ void enter2FaDialog(
 }
 
 // This dialog should not be dismissed, otherwise it will be black screen, have not reproduced this.
+// El nombre de la sesion llega como "rdp: PC05" (tipo de sesion + usuario), asi
+// que la regla "PC..." se evalua sobre el usuario y no sobre el prefijo.
+bool _sessionIsPc(String name) {
+  final trimmed = name.trim();
+  if (trimmed.toUpperCase().startsWith('PC')) {
+    return true;
+  }
+  final i = trimmed.indexOf(':');
+  if (i < 0) {
+    return false;
+  }
+  return trimmed.substring(i + 1).trim().toUpperCase().startsWith('PC');
+}
+
 void showWindowsSessionsDialog(
     String type,
     String title,
@@ -2442,7 +2456,7 @@ void showWindowsSessionsDialog(
 
   // Con una sola sesion "PC..." no hace falta molestar con el dialogo: se
   // conecta directo. El resto si pasa por el dialogo (y la clave 777).
-  if (names.length == 1 && names.first.toUpperCase().startsWith('PC')) {
+  if (names.length == 1 && _sessionIsPc(names.first)) {
     dialogManager.dismissAll();
     sendSelected();
     return;
@@ -2453,7 +2467,7 @@ void showWindowsSessionsDialog(
     submit() {
       // Las sesiones cuyo usuario empieza con "PC" entran sin clave; el resto
       // pide la clave de acceso antes de conectar.
-      if (selectedName().toUpperCase().startsWith('PC')) {
+      if (_sessionIsPc(selectedName())) {
         sendSelected();
         close();
         return;
