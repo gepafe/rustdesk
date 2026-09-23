@@ -29,12 +29,14 @@ class PeerSortType {
   static const String remoteHost = 'Remote Host';
   static const String username = 'Username';
   static const String status = 'Status';
+  static const String custom = 'Personalizado';
 
   static List<String> values = [
     PeerSortType.remoteId,
     PeerSortType.remoteHost,
     PeerSortType.username,
-    PeerSortType.status
+    PeerSortType.status,
+    PeerSortType.custom
   ];
 }
 
@@ -64,8 +66,31 @@ RxString get peerSort {
   return _peerSort!;
 }
 
+/// Orden manual de los equipos: ids separados por salto de linea.
+const kOptionPeerOrder = "peer-order";
+
+/// Cambia para forzar el rebuild cuando se mueve un equipo.
+final peerOrderVersion = "".obs;
+
+/// Con esto activo cada fila muestra subir/bajar y mover a carpeta.
+final peerOrderEditMode = false.obs;
+
+List<String> loadPeerOrder() {
+  final v = bind.getLocalFlutterOption(k: kOptionPeerOrder);
+  return v.isEmpty ? <String>[] : v.split('\n');
+}
+
+void savePeerOrder(List<String> ids) =>
+    bind.setLocalFlutterOption(k: kOptionPeerOrder, v: ids.join('\n'));
+
+void bumpPeerOrderVersion() =>
+    peerOrderVersion.value = DateTime.now().microsecondsSinceEpoch.toString();
+
+String peerFolderKey(String id) => peerFolderModel.folderOf(id)?.name ?? '';
+
 // list for listener
-RxList<RxString> get obslist => [peerSearchText, peerSort].obs;
+RxList<RxString> get obslist =>
+    [peerSearchText, peerSort, peerOrderVersion].obs;
 
 final peerSearchTextController =
     TextEditingController(text: peerSearchText.value);
@@ -254,7 +279,7 @@ class _PeersViewState extends State<_PeersView>
               // No need to listen the currentTab change event.
               // Because the currentTab change event will trigger the peers change event,
               // and the peers change event will trigger _buildPeersView().
-              return !isPortrait
+              final card = !isPortrait
                   ? Obx(() => peerCardUiType.value == PeerUiType.list
                       ? Container(height: 26, child: visibilityChild)
                       : peerCardUiType.value == PeerUiType.grid
@@ -263,6 +288,12 @@ class _PeersViewState extends State<_PeersView>
                           : SizedBox(
                               width: 220, height: 42, child: visibilityChild))
                   : Container(child: visibilityChild);
+              return Obx(() => peerOrderEditMode.value
+                  ? Row(children: [
+                      _orderButtons(peer, peers),
+                      Expanded(child: card),
+                    ])
+                  : card);
             }
 
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
@@ -325,6 +356,49 @@ class _PeersViewState extends State<_PeersView>
     }, obslist);
 
     return body;
+  }
+
+  Widget _orderButtons(Peer peer, List<Peer> visible) {
+    final folderKey = peerFolderKey(peer.id);
+    Widget btn(IconData icon, String tip, VoidCallback onTap) => IconButton(
+          icon: Icon(icon, size: 16),
+          iconSize: 16,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+          tooltip: tip,
+          onPressed: onTap,
+        );
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      btn(Icons.keyboard_arrow_up, 'Subir',
+          () => _movePeerOrder(visible, peer.id, folderKey, -1)),
+      btn(Icons.keyboard_arrow_down, 'Bajar',
+          () => _movePeerOrder(visible, peer.id, folderKey, 1)),
+      btn(Icons.drive_file_move_outlined, 'Mover a carpeta',
+          () => showPeerFolderPickerDialog(peer.id)),
+    ]);
+  }
+
+  void _movePeerOrder(
+      List<Peer> visible, String id, String folderKey, int delta) {
+    final order = loadPeerOrder();
+    final visibleIds = visible.map((e) => e.id).toSet();
+    for (final p in visible) {
+      if (!order.contains(p.id)) order.add(p.id);
+    }
+    final candidates = order
+        .where((e) => visibleIds.contains(e) && peerFolderKey(e) == folderKey)
+        .toList();
+    final i = candidates.indexOf(id);
+    if (i < 0) return;
+    final j = i + delta;
+    if (j < 0 || j >= candidates.length) return;
+    final neighbor = candidates[j];
+    order.remove(id);
+    final at = order.indexOf(neighbor);
+    if (at < 0) return;
+    order.insert(delta > 0 ? at + 1 : at, id);
+    savePeerOrder(order);
+    bumpPeerOrderVersion();
   }
 
   Widget _buildGroupedList(
@@ -456,7 +530,18 @@ class _PeersViewState extends State<_PeersView>
       );
     }
 
-    if (widget.peers.loadEvent != LoadEvent.recent) {
+    if (sortedBy == PeerSortType.custom) {
+      final order = loadPeerOrder();
+      final indexOf = <String, int>{};
+      for (var i = 0; i < order.length; i++) {
+        indexOf[order[i]] = i;
+      }
+      peers.sort((p1, p2) {
+        final i1 = indexOf[p1.id] ?? 1 << 30;
+        final i2 = indexOf[p2.id] ?? 1 << 30;
+        return i1 != i2 ? i1.compareTo(i2) : p1.getId().compareTo(p2.getId());
+      });
+    } else if (widget.peers.loadEvent != LoadEvent.recent) {
       switch (sortedBy) {
         case PeerSortType.remoteId:
           peers.sort((p1, p2) => p1.getId().compareTo(p2.getId()));

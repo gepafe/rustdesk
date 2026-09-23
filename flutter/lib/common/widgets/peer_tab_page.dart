@@ -552,6 +552,16 @@ class _PeerTabPageState extends State<PeerTabPage>
         });
   }
 
+  /// Activa/desactiva las flechas para ordenar los equipos a mano.
+  void _togglePeerOrderEdit() {
+    final on = !peerOrderEditMode.value;
+    peerOrderEditMode.value = on;
+    if (on) {
+      peerSort.value = PeerSortType.custom;
+      bind.setLocalFlutterOption(k: kOptionPeerSorting, v: PeerSortType.custom);
+    }
+  }
+
   List<Widget> _landscapeRightActions(BuildContext context) {
     final model = Provider.of<PeerTabModel>(context);
     return [
@@ -589,6 +599,12 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Nueva carpeta'),
         child: Icon(Icons.create_new_folder_outlined, size: 18),
         onTap: () => showNewFolderDialog(),
+      ).marginOnly(right: 6),
+      _hoverAction(
+        context: context,
+        toolTip: 'Editar posiciones',
+        child: Icon(Icons.swap_vert, size: 18),
+        onTap: _togglePeerOrderEdit,
       ).marginOnly(right: 6),
       if (isWindows)
         _hoverAction(
@@ -700,6 +716,12 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Nueva carpeta'),
         child: Icon(Icons.create_new_folder_outlined, size: 18),
         onTap: () => showNewFolderDialog(),
+      ),
+      _hoverAction(
+        context: context,
+        toolTip: 'Editar posiciones',
+        child: Icon(Icons.swap_vert, size: 18),
+        onTap: _togglePeerOrderEdit,
       ),
       _createPeerViewTypeSwitch(context)
     ];
