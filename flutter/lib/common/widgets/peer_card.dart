@@ -633,19 +633,11 @@ abstract class BasePeerCard extends StatelessWidget {
   // Accesos rapidos como primeras opciones del menu de los 3 puntos.
   List<MenuEntryBase<String>> _quickMenuItems(BuildContext context) => [
         MenuEntryButton<String>(
-          childBuilder: (TextStyle? style) => Text('VER', style: style),
+          childBuilder: (TextStyle? style) =>
+              Text('VER SOLAMENTE', style: style),
           proc: () async {
             await bind.mainSetPeerOption(
                 id: peer.id, key: kOptionViewOnly, value: 'Y');
-            connectInPeerTab(context, peer, tab);
-          },
-          dismissOnClicked: true,
-        ),
-        MenuEntryButton<String>(
-          childBuilder: (TextStyle? style) => Text('CONTROLAR', style: style),
-          proc: () async {
-            await bind.mainSetPeerOption(
-                id: peer.id, key: kOptionViewOnly, value: '');
             connectInPeerTab(context, peer, tab);
           },
           dismissOnClicked: true,
@@ -694,6 +686,27 @@ abstract class BasePeerCard extends StatelessWidget {
           },
           dismissOnClicked: true,
         ),
+        if (isWindows)
+          MenuEntryButton<String>(
+            childBuilder: (TextStyle? style) =>
+                Text('Crear acceso RDP en el escritorio', style: style),
+            proc: () async {
+              final username = await bind.mainGetPeerOption(
+                  id: peer.id, key: 'rdp_username');
+              final password = await bind.mainGetPeerOption(
+                  id: peer.id, key: 'rdp_password');
+              if (username.isEmpty && password.isEmpty) {
+                showToast('Primero configura el usuario y la contrasena de RDP');
+                _rdpDialog(peer.id);
+                return;
+              }
+              bind.mainCreateRdpShortcut(id: peer.id);
+              showToast(translate('Successful'));
+            },
+            dismissOnClicked: true,
+          ),
+        if (isWindows) _createShortCutAction(peer.id),
+        _transferFileAction(context),
         if (isWindows)
           MenuEntryButton<String>(
             childBuilder: (TextStyle? style) => Text(
@@ -1030,41 +1043,6 @@ abstract class BasePeerCard extends StatelessWidget {
   }
 
   @protected
-  MenuEntryBase<String> _rmFavAction(
-      String id, Future<void> Function() reloadFunc) {
-    return MenuEntryButton<String>(
-      childBuilder: (TextStyle? style) => Row(
-        children: [
-          Text(
-            translate('Remove from Favorites'),
-            style: style,
-          ),
-          Expanded(
-              child: Align(
-            alignment: Alignment.centerRight,
-            child: Transform.scale(
-              scale: 0.8,
-              child: Icon(Icons.star),
-            ),
-          ).marginOnly(right: 4)),
-        ],
-      ),
-      proc: () {
-        () async {
-          final favs = (await bind.mainGetFav()).toList();
-          if (favs.remove(id)) {
-            await bind.mainStoreFav(favs: favs);
-            await reloadFunc();
-          }
-          showToast(translate('Successful'));
-        }();
-      },
-      padding: menuPadding,
-      dismissOnClicked: true,
-    );
-  }
-
-  @protected
   MenuEntryBase<String> _addToAb(Peer peer) {
     return MenuEntryButton<String>(
       childBuilder: (TextStyle? style) => Text(
@@ -1119,9 +1097,6 @@ class RecentPeerCard extends BasePeerCard {
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
-    if (isWindows) {
-      menuItems.add(_createShortCutAction(peer.id));
-    }
     menuItems.add(MenuEntryDivider());
     if (isMobile || isDesktop || isWebDesktop) {
       menuItems.add(_renameAction(peer.id));
@@ -1132,8 +1107,6 @@ class RecentPeerCard extends BasePeerCard {
 
     if (!favs.contains(peer.id)) {
       menuItems.add(_addFavAction(peer.id));
-    } else {
-      menuItems.add(_rmFavAction(peer.id, () async {}));
     }
 
     if (gFFI.userModel.userName.isNotEmpty) {
@@ -1145,8 +1118,6 @@ class RecentPeerCard extends BasePeerCard {
     if (peerFolderModel.folderOf(peer.id) != null) {
       menuItems.add(_removeFromFolderAction(peer.id));
     }
-    menuItems.add(MenuEntryDivider());
-    menuItems.add(_viewOnlyAction(peer.id));
     menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;
@@ -1203,35 +1174,6 @@ class RecentPeerCard extends BasePeerCard {
   }
 
   @protected
-  MenuEntryButton<String> _viewOnlyAction(String id) {
-    final enabled =
-        bind.mainGetPeerOptionSync(id: id, key: kOptionViewOnly) == 'Y';
-    return MenuEntryButton<String>(
-      childBuilder: (TextStyle? style) => Row(
-        children: [
-          Text(
-            translate('Solo ver'),
-            style: style,
-          ),
-          Expanded(
-              child: Align(
-            alignment: Alignment.centerRight,
-            child: Transform.scale(
-              scale: 0.8,
-              child: Icon(
-                  enabled ? Icons.check_box : Icons.check_box_outline_blank),
-            ),
-          ).marginOnly(right: 4)),
-        ],
-      ),
-      proc: () => bind.mainSetPeerOption(
-          id: id, key: kOptionViewOnly, value: enabled ? '' : 'Y'),
-      padding: menuPadding,
-      dismissOnClicked: true,
-    );
-  }
-
-  @protected
   @override
   void _update() => bind.mainLoadRecentPeers();
 }
@@ -1264,9 +1206,6 @@ class FavoritePeerCard extends BasePeerCard {
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
-    if (isWindows) {
-      menuItems.add(_createShortCutAction(peer.id));
-    }
     menuItems.add(MenuEntryDivider());
     if (isMobile || isDesktop || isWebDesktop) {
       menuItems.add(_renameAction(peer.id));
@@ -1274,10 +1213,6 @@ class FavoritePeerCard extends BasePeerCard {
     if (await bind.mainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
     }
-    menuItems.add(_rmFavAction(peer.id, () async {
-      await bind.mainLoadFavPeers();
-    }));
-
     if (gFFI.userModel.userName.isNotEmpty) {
       menuItems.add(_addToAb(peer));
     }
@@ -1323,14 +1258,9 @@ class DiscoveredPeerCard extends BasePeerCard {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
     }
     menuItems.add(_wolAction(peer.id));
-    if (isWindows) {
-      menuItems.add(_createShortCutAction(peer.id));
-    }
 
     if (!favs.contains(peer.id)) {
       menuItems.add(_addFavAction(peer.id));
-    } else {
-      menuItems.add(_rmFavAction(peer.id, () async {}));
     }
 
     if (gFFI.userModel.userName.isNotEmpty) {
@@ -1374,9 +1304,6 @@ class AddressBookPeerCard extends BasePeerCard {
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
-    }
-    if (isWindows) {
-      menuItems.add(_createShortCutAction(peer.id));
     }
     if (gFFI.abModel.current.canWrite()) {
       menuItems.add(MenuEntryDivider());
@@ -1527,9 +1454,6 @@ class MyGroupPeerCard extends BasePeerCard {
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
       menuItems.add(await _forceAlwaysRelayAction(peer.id));
-    }
-    if (isWindows) {
-      menuItems.add(_createShortCutAction(peer.id));
     }
     // menuItems.add(MenuEntryDivider());
     // menuItems.add(_renameAction(peer.id));
