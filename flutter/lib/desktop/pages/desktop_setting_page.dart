@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
+import 'package:flutter_hbb/common/widgets/config_backup.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -2599,6 +2600,16 @@ class _AboutState extends State<_About> {
                         .marginSymmetric(vertical: 4.0)),
               SelectionArea(
                   child: Text('${translate('ID')}: $myId')
+                      .marginSymmetric(vertical: 4.0)),
+              InkWell(
+                  onTap: () => showExportConfigBackupDialog(context),
+                  child: const Text('Exportar copia de seguridad (equipos y config)',
+                          style: linkStyle)
+                      .marginSymmetric(vertical: 4.0)),
+              InkWell(
+                  onTap: () => showImportConfigBackupDialog(context),
+                  child: const Text('Importar copia de seguridad',
+                          style: linkStyle)
                       .marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {

@@ -2197,6 +2197,18 @@ pub fn main_create_rdp_shortcut(_id: String) {
     create_rdp_shortcut(_id);
 }
 
+pub fn main_export_config_backup() -> String {
+    crate::backup::export()
+}
+
+pub fn main_import_config_backup(data: String) -> i32 {
+    let count = crate::backup::import(&data);
+    if count > 0 {
+        crate::backup::restart();
+    }
+    count
+}
+
 pub fn cm_send_chat(conn_id: i32, msg: String) {
     #[cfg(not(any(target_os = "ios")))]
     crate::ui_cm_interface::send_chat(conn_id, msg);

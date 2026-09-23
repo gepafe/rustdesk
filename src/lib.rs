@@ -39,6 +39,8 @@ pub mod flutter;
 pub mod flutter_ffi;
 use common::*;
 mod auth_2fa;
+#[cfg(feature = "flutter")]
+mod backup;
 #[cfg(not(target_os = "ios"))]
 mod clipboard;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
