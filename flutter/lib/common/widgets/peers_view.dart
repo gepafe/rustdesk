@@ -271,8 +271,11 @@ class _PeersViewState extends State<_PeersView>
                 ? ListView.builder(
                     itemCount: peers.length,
                     itemBuilder: (BuildContext context, int index) {
+                      final v = peerCardUiType.value == PeerUiType.list
+                          ? space / 4
+                          : space / 2;
                       return buildOnePeer(peers[index], true).marginOnly(
-                          top: index == 0 ? 0 : space / 2, bottom: space / 2);
+                          top: index == 0 ? 0 : v, bottom: v);
                     },
                   )
                 : peerCardUiType.value == PeerUiType.list

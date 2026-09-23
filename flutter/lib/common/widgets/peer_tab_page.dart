@@ -686,7 +686,14 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Actualizar'),
         child: Icon(Icons.refresh_rounded, size: 18),
         onTap: () => probeCurrentTabPeersInfo(),
-      )
+      ),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Nueva carpeta'),
+        child: Icon(Icons.create_new_folder_outlined, size: 18),
+        onTap: () => showNewFolderDialog(),
+      ),
+      _createPeerViewTypeSwitch(context)
     ];
     final rightWidth = availableWidth -
         searchWidth -

@@ -85,6 +85,11 @@ class _PeerCardState extends State<_PeerCard>
 
   Widget _buildPortrait() {
     final peer = super.widget.peer;
+    // En vista de lista, en el celular tambien una sola linea por equipo.
+    if (peerCardUiType.value == PeerUiType.list) {
+      return gestureDetector(
+          child: makeChild(true, peer).paddingSymmetric(horizontal: 8));
+    }
     return Card(
         margin: EdgeInsets.symmetric(horizontal: 2),
         child: gestureDetector(
@@ -197,7 +202,7 @@ class _PeerCardState extends State<_PeerCard>
 
     // Vista de lista: una sola linea por equipo (mas compacta) e incluye las
     // sesiones de Windows activas, que antes solo se veian en la vista grande.
-    if (!isPortrait && peerCardUiType.value == PeerUiType.list) {
+    if (peerCardUiType.value == PeerUiType.list) {
       return _listRow(peer, name, greyStyle);
     }
 
