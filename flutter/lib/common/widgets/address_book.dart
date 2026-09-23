@@ -4,6 +4,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:dynamic_layouts/dynamic_layouts.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/hbbs/hbbs.dart';
 import 'package:flutter_hbb/common/widgets/peer_card.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
+import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -1014,6 +1016,60 @@ void showImportPeersBulkDialog() {
         dialogButton("OK", onPressed: submit),
       ],
       onSubmit: submit,
+      onCancel: close,
+    );
+  });
+}
+
+/// Lista de equipos en el mismo formato que [showImportPeersBulkDialog]:
+/// una linea por equipo, `ID;Nombre;Grupo`.
+String peersBulkText(List<Peer> peers) {
+  final lines = <String>[];
+  final seen = <String>{};
+  for (final p in peers) {
+    if (p.id.isEmpty || !seen.add(p.id)) {
+      continue;
+    }
+    final name = p.alias.isNotEmpty ? p.alias : p.hostname;
+    lines.add([p.id, name, p.device_group_name].join(';'));
+  }
+  return lines.join('\n');
+}
+
+/// Copia la lista de equipos al portapapeles en el formato de importar.
+void copyPeersBulk(List<Peer> peers) async {
+  await Clipboard.setData(ClipboardData(text: peersBulkText(peers)));
+  showToast(translate("Lista copiada al portapapeles"));
+}
+
+/// Muestra la lista de equipos en el formato de importar, para copiarla.
+void showExportPeersBulkDialog(List<Peer> peers) {
+  final controller = TextEditingController(text: peersBulkText(peers));
+  gFFI.dialogManager.show((setState, close, context) {
+    return CustomAlertDialog(
+      title: Text(translate("Exportar lista")),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            translate(
+                "Copia la lista y pegala en Importar equipos. Formato: ID;Nombre;Grupo"),
+            style: TextStyle(fontSize: 13),
+          ).marginOnly(bottom: 8),
+          TextField(
+            controller: controller,
+            readOnly: true,
+            maxLines: 12,
+            minLines: 6,
+            decoration: InputDecoration(border: OutlineInputBorder()),
+          ).workaroundFreezeLinuxMint(),
+        ],
+      ),
+      actions: [
+        dialogButton("Copiar", onPressed: () => copyPeersBulk(peers)),
+        dialogButton("Cancel", onPressed: close, isOutline: true),
+      ],
       onCancel: close,
     );
   });

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/address_book.dart';
+import 'package:flutter_hbb/common/widgets/peer_info_probe.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/my_group.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
@@ -566,6 +567,24 @@ class _PeerTabPageState extends State<PeerTabPage>
       ).marginOnly(left: 6, right: 6),
       _hoverAction(
         context: context,
+        toolTip: translate('Exportar lista'),
+        child: Icon(Icons.ios_share, size: 18),
+        onTap: () => showExportPeersBulkDialog(model.currentTabCachedPeers),
+      ).marginOnly(right: 6),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Copiar'),
+        child: Icon(Icons.copy_rounded, size: 18),
+        onTap: () => copyPeersBulk(model.currentTabCachedPeers),
+      ).marginOnly(right: 6),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Actualizar'),
+        child: Icon(Icons.refresh_rounded, size: 18),
+        onTap: () => probeCurrentTabPeersInfo(),
+      ).marginOnly(right: 6),
+      _hoverAction(
+        context: context,
         toolTip: translate('Nueva carpeta'),
         child: Icon(Icons.create_new_folder_outlined, size: 18),
         onTap: () => showNewFolderDialog(),
@@ -649,6 +668,24 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Importar equipos'),
         child: Icon(Icons.playlist_add_rounded, size: 18),
         onTap: () => showImportPeersBulkDialog(),
+      ),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Exportar lista'),
+        child: Icon(Icons.ios_share, size: 18),
+        onTap: () => showExportPeersBulkDialog(model.currentTabCachedPeers),
+      ),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Copiar'),
+        child: Icon(Icons.copy_rounded, size: 18),
+        onTap: () => copyPeersBulk(model.currentTabCachedPeers),
+      ),
+      _hoverAction(
+        context: context,
+        toolTip: translate('Actualizar'),
+        child: Icon(Icons.refresh_rounded, size: 18),
+        onTap: () => probeCurrentTabPeersInfo(),
       )
     ];
     final rightWidth = availableWidth -

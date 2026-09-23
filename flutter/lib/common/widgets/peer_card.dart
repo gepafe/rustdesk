@@ -141,13 +141,16 @@ class _PeerCardState extends State<_PeerCard>
         color: Theme.of(context).colorScheme.background,
         borderRadius: BorderRadius.circular(_tileRadius),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
         children: [
           getOnline(6, peer.online),
-          const SizedBox(width: 8),
-          getPlatformImage(peer.platform, size: 18),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
+          peer.platform == kPeerPlatformWindows
+              ? Icon(Icons.desktop_windows,
+                  size: 16, color: const Color(0xFF2C88D9))
+              : getPlatformImage(peer.platform, size: 16),
+          const SizedBox(width: 6),
           Text(
             peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
             style: Theme.of(context).textTheme.titleSmall,
@@ -163,7 +166,7 @@ class _PeerCardState extends State<_PeerCard>
                       style: greyStyle,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
-                    ).marginOnly(left: 12),
+                    ).marginOnly(left: 8),
                   ),
                 if (sessions.isNotEmpty)
                   Flexible(
@@ -172,7 +175,7 @@ class _PeerCardState extends State<_PeerCard>
                       style: greyStyle,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
-                    ).marginOnly(left: 12),
+                    ).marginOnly(left: 8),
                   ),
               ],
             ),

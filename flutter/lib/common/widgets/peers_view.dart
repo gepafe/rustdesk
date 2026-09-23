@@ -18,6 +18,7 @@ import '../../models/peer_folder_model.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import 'peer_card.dart';
+import 'peer_info_probe.dart';
 
 typedef PeerFilter = bool Function(Peer peer);
 typedef PeerCardBuilder = Widget Function(Peer peer);
@@ -254,7 +255,7 @@ class _PeersViewState extends State<_PeersView>
               // and the peers change event will trigger _buildPeersView().
               return !isPortrait
                   ? Obx(() => peerCardUiType.value == PeerUiType.list
-                      ? Container(height: 30, child: visibilityChild)
+                      ? Container(height: 26, child: visibilityChild)
                       : peerCardUiType.value == PeerUiType.grid
                           ? SizedBox(
                               width: 220, height: 140, child: visibilityChild)
@@ -281,8 +282,8 @@ class _PeersViewState extends State<_PeersView>
                         itemBuilder: (BuildContext context, int index) {
                           return buildOnePeer(peers[index], false).marginOnly(
                               right: space,
-                              top: index == 0 ? 0 : space / 2,
-                              bottom: space / 2);
+                              top: index == 0 ? 0 : space / 4,
+                              bottom: space / 4);
                         },
                       )
                     : DynamicGridView.builder(
@@ -329,8 +330,10 @@ class _PeersViewState extends State<_PeersView>
     final children = <Widget>[];
 
     void addPeer(Peer p) {
-      children.add(buildOnePeer(p, false).marginOnly(
-          right: space, top: space / 2, bottom: space / 2));
+      // En vista de lista, filas mas juntas para que entren mas equipos.
+      final v = peerCardUiType.value == PeerUiType.list ? space / 4 : space / 2;
+      children.add(
+          buildOnePeer(p, false).marginOnly(right: space, top: v, bottom: v));
     }
 
     for (final folder in fm.folders) {
@@ -420,6 +423,8 @@ class _PeersViewState extends State<_PeersView>
     if (_curPeers.isNotEmpty) {
       bind.queryOnlines(ids: _curPeers.toList(growable: false));
       _queryCount = 0;
+      // Primer chequeo automatico al abrir la app.
+      if (isLoadEvent) probePeersInfoOnStart();
     }
     _lastQueryPeers = {..._curPeers};
     if (isLoadEvent) {
@@ -698,7 +703,7 @@ class _FolderHeader extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(
           children: [
             Icon(
