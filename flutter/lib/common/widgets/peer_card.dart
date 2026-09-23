@@ -88,8 +88,13 @@ class _PeerCardState extends State<_PeerCard>
     final peer = super.widget.peer;
     // En vista de lista, en el celular tambien una sola linea por equipo.
     if (peerCardUiType.value == PeerUiType.list) {
-      return gestureDetector(
-          child: makeChild(true, peer).paddingSymmetric(horizontal: 8));
+      return Card(
+          margin: EdgeInsets.symmetric(horizontal: 2),
+          child: gestureDetector(
+            child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: makeChild(true, peer)),
+          ));
     }
     return Card(
         margin: EdgeInsets.symmetric(horizontal: 2),
@@ -144,7 +149,9 @@ class _PeerCardState extends State<_PeerCard>
     final sessions = _cachedWindowsSessions(peer.id);
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.background,
+        color: stateGlobal.isPortrait.isTrue
+            ? Colors.transparent
+            : Theme.of(context).colorScheme.background,
         borderRadius: BorderRadius.circular(_tileRadius),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -644,30 +651,12 @@ abstract class BasePeerCard extends StatelessWidget {
           dismissOnClicked: true,
         ),
         MenuEntryButton<String>(
-          childBuilder: (TextStyle? style) => Text('RDP', style: style),
-          proc: () => _rdpDialog(
-            peer.id,
-            save: false,
-            onDone: (port, username, password) async {
-              // Credenciales de una sola conexion: no se guardan.
-              await bind.mainSetPeerOption(
-                  id: peer.id, key: 'rdp_tmp_port', value: port);
-              await bind.mainSetPeerOption(
-                  id: peer.id, key: 'rdp_tmp_username', value: username);
-              await bind.mainSetPeerOption(
-                  id: peer.id, key: 'rdp_tmp_password', value: password);
-              connectInPeerTab(context, peer, tab, isRDP: true);
-            },
-          ),
-          dismissOnClicked: true,
-        ),
-        MenuEntryButton<String>(
           childBuilder: (TextStyle? style) => Container(
               alignment: AlignmentDirectional.center,
               height: CustomPopupMenuTheme.height,
               child: Row(
                 children: [
-                  Text('RDP GUARDADO', style: style),
+                  Text('RDP', style: style),
                   Expanded(
                       child: Align(
                     alignment: Alignment.centerRight,
