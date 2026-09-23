@@ -2412,15 +2412,27 @@ void enter2FaDialog(
 // El nombre de la sesion llega como "rdp: PC05" (tipo de sesion + usuario), asi
 // que la regla "PC..." se evalua sobre el usuario y no sobre el prefijo.
 bool _sessionIsPc(String name) {
+  bool matches(String s) {
+    final v = s.trim().toUpperCase();
+    if (v.startsWith('PC')) {
+      return true;
+    }
+    // Tambien 'P' seguida de un numero (P1, P05, ...).
+    if (v.startsWith('P') && v.length > 1) {
+      return int.tryParse(v.substring(1)) != null;
+    }
+    return false;
+  }
+
   final trimmed = name.trim();
-  if (trimmed.toUpperCase().startsWith('PC')) {
+  if (matches(trimmed)) {
     return true;
   }
   final i = trimmed.indexOf(':');
   if (i < 0) {
     return false;
   }
-  return trimmed.substring(i + 1).trim().toUpperCase().startsWith('PC');
+  return matches(trimmed.substring(i + 1));
 }
 
 void showWindowsSessionsDialog(
