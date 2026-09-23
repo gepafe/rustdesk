@@ -180,11 +180,31 @@ pub async fn listen(
             }
             _ = rdp_done_rx.recv() => {
                 clear_rdp_credentials(addr.port());
+                notify_rdp_closed(&id);
                 break;
             }
         }
     }
     Ok(())
+}
+
+/// Avisa a la UI que se cerro la ventana de RDP (mstsc terminado) para que
+/// cierre la pestana correspondiente.
+fn notify_rdp_closed(id: &str) {
+    #[cfg(feature = "flutter")]
+    {
+        use std::collections::HashMap;
+        let data = HashMap::from([
+            ("name", "callback_rdp_closed".to_owned()),
+            ("id", id.to_owned()),
+        ]);
+        let _ = crate::flutter::push_global_event(
+            crate::flutter::APP_TYPE_MAIN,
+            serde_json::ser::to_string(&data).unwrap_or_default(),
+        );
+    }
+    #[cfg(not(feature = "flutter"))]
+    let _ = id;
 }
 
 async fn connect_and_login(

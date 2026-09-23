@@ -12,6 +12,7 @@ const double _kColumn1Width = 30;
 const double _kColumn4Width = 100;
 const double _kRowHeight = 60;
 const double _kTextLeftMargin = 20;
+const _kRdpClosedEvent = 'callback_rdp_closed';
 
 class _PortForward {
   int localPort;
@@ -61,6 +62,7 @@ class _PortForwardPageState extends State<PortForwardPage>
   final TextEditingController remotePortController = TextEditingController();
   RxList<_PortForward> pfs = RxList.empty(growable: true);
   late FFI _ffi;
+  String? _rdpClosedHandler;
 
   @override
   void initState() {
@@ -75,6 +77,16 @@ class _PortForwardPageState extends State<PortForwardPage>
         isRdp: widget.isRDP);
     Get.put<FFI>(_ffi, tag: 'pf_${widget.id}');
     debugPrint("Port forward page init success with id ${widget.id}");
+    if (widget.isRDP) {
+      _rdpClosedHandler =
+          'pf_rdp_${widget.id}_${DateTime.now().microsecondsSinceEpoch}';
+      platformFFI.registerEventHandler(_kRdpClosedEvent, _rdpClosedHandler!,
+          (evt) async {
+        if (evt['id'] == widget.id) {
+          widget.tabController.closeBy(widget.id);
+        }
+      });
+    }
     // Call onSelected in post frame callback, since we cannot guarantee that the callback will not call setState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.tabController.onSelected?.call(widget.id);
@@ -83,6 +95,9 @@ class _PortForwardPageState extends State<PortForwardPage>
 
   @override
   void dispose() {
+    if (_rdpClosedHandler != null) {
+      platformFFI.unregisterEventHandler(_kRdpClosedEvent, _rdpClosedHandler!);
+    }
     _ffi.close();
     _ffi.dialogManager.dismissAll();
     Get.delete<FFI>(tag: 'pf_${widget.id}');
