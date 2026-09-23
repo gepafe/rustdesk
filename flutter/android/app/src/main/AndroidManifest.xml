@@ -31,6 +31,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="RustDesk"
         android:roundIcon="@mipmap/ic_launcher"
+        android:hasFragileUserData="true"
+        android:allowBackup="true"
         android:supportsRtl="true">
 
         <receiver
