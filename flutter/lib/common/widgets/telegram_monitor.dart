@@ -107,7 +107,7 @@ void startTelegramMonitor() {
       (evt) async {
     _onQueryOnlines(evt);
   });
-  Timer.periodic(const Duration(seconds: 60), (_) {
+    Timer.periodic(const Duration(seconds: 10), (_) {
     if (_monitored.isEmpty) return;
     bind.queryOnlines(ids: _monitored.toList());
   });
