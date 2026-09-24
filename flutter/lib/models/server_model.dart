@@ -141,8 +141,8 @@ class ServerModel with ChangeNotifier {
     _emptyIdShow = translate("Generating ...");
     _serverId = IDTextEditingController(text: _emptyIdShow);
 
-    /*
-    // initital _hideCm at startup
+    // initital _hideCm at startup: solo se oculta donde este permitido
+    // (allow-hide-cm + aprobacion por password con clave permanente).
     final verificationMethod =
         bind.mainGetOptionSync(key: kOptionVerificationMethod);
     final approveMode = bind.mainGetOptionSync(key: kOptionApproveMode);
@@ -152,7 +152,6 @@ class ServerModel with ChangeNotifier {
         verificationMethod == kUsePermanentPassword)) {
       _hideCm = false;
     }
-    */
 
     timerCallback() async {
       final connectionStatus =
@@ -170,10 +169,12 @@ class ServerModel with ChangeNotifier {
           updateClientState(res);
         } else {
           if (_clients.isEmpty) {
-            hideCmWindow();
-            if (_zeroClientLengthCounter++ == 12) {
-              // 6 second
-              windowManager.close();
+            if (hideCm) {
+              hideCmWindow();
+              if (_zeroClientLengthCounter++ == 12) {
+                // 6 second
+                windowManager.close();
+              }
             }
           } else {
             _zeroClientLengthCounter = 0;
@@ -518,7 +519,7 @@ class ServerModel with ChangeNotifier {
     }
     if (desktopType == DesktopType.cm) {
       if (_clients.isEmpty) {
-        hideCmWindow();
+        if (hideCm) hideCmWindow();
       } else if (!hideCm) {
         showCmWindow();
       }
@@ -718,7 +719,7 @@ class ServerModel with ChangeNotifier {
         parent.target?.invokeMethod("cancel_notification", id);
       }
       if (desktopType == DesktopType.cm && _clients.isEmpty) {
-        hideCmWindow();
+        if (hideCm) hideCmWindow();
       }
       if (isAndroid) androidUpdatekeepScreenOn();
       notifyListeners();

@@ -281,11 +281,7 @@ void runMultiWindow(
       exit(0);
   }
   // show window from hidden status
-  // La ventana de PortForward (RDP) queda oculta a proposito: no debe quedar
-  // detras ni poder cerrarse por error (cerrarla corta el RDP).
-  if (appType != kAppTypeDesktopPortForward) {
-    WindowController.fromWindowId(kWindowId!).show();
-  }
+  WindowController.fromWindowId(kWindowId!).show();
 }
 
 void runConnectionManagerScreen() async {
@@ -295,9 +291,9 @@ void runConnectionManagerScreen() async {
     const DesktopServerPage(),
     MyTheme.currentThemeMode(),
   );
-  // Cliente personalizado: forzar ocultar la ventana de gestión de conexiones.
-  gFFI.serverModel.hideCm = true;
-  await hideCmWindow(isStartup: true);
+  // Cliente personalizado: la ventana ya no arranca oculta. Se muestra normal y
+  // solo se esconde en los equipos donde este configurado hide-cm (destino).
+  _isCmReadyToShow = true;
   setResizable(false);
   // Start the uni links handler and redirect links to Native, not for Flutter.
   listenUniLinks(handleByFlutter: false);
