@@ -215,6 +215,8 @@ const String kOptionDisableUnlockPin = "disable-unlock-pin";
 // Cliente personalizado: PIN propio para desbloquear la app al abrirla
 // (separado del PIN de la sesión de Seguridad).
 const String kOptionAppLockPin = "app-lock-pin";
+const String kOptionAppLockResumeCount = "app-lock-pin-resume-count";
+const String kOptionAppLockAskedCount = "app-lock-pin-asked-count";
 const kHideUsernameOnCard = "hide-username-on-card";
 const String kOptionHideHelpCards = "hide-help-cards";
 const String kOptionAllowDeepLinkPassword = "allow-deep-link-password";

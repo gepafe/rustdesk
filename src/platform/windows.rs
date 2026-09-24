@@ -2318,6 +2318,33 @@ oLink.Save
     Ok(())
 }
 
+/// Avisa a la UI cuando el equipo vuelve de suspension: si el reloj de pared
+/// salta mas que este intervalo, la maquina estuvo dormida.
+pub fn spawn_resume_watcher() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || loop {
+        let before = std::time::SystemTime::now();
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        if let Ok(elapsed) = before.elapsed() {
+            if elapsed.as_secs() > 60 {
+                #[cfg(feature = "flutter")]
+                {
+                    use std::collections::HashMap;
+                    let data = HashMap::from([("name", "callback_device_resumed".to_owned())]);
+                    crate::flutter::push_global_event(
+                        crate::flutter::APP_TYPE_MAIN,
+                        serde_json::ser::to_string(&data).unwrap_or_default(),
+                    );
+                }
+            }
+        }
+    });
+}
+
 /// Acceso directo en el escritorio que abre la conexion RDP del equipo.
 pub fn create_rdp_shortcut(id: &str) -> ResultType<()> {
     if !crate::common::is_valid_untrusted_peer_id(id) {

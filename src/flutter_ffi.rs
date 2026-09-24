@@ -2197,6 +2197,11 @@ pub fn main_create_rdp_shortcut(_id: String) {
     create_rdp_shortcut(_id);
 }
 
+pub fn main_start_resume_watcher() {
+    #[cfg(windows)]
+    crate::platform::windows::spawn_resume_watcher();
+}
+
 pub fn main_export_config_backup() -> String {
     crate::backup::export()
 }

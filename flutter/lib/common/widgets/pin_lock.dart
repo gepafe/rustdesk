@@ -15,6 +15,9 @@ import 'package:window_manager/window_manager.dart';
 /// Solo afecta a la interfaz; las conexiones entrantes las atiende el
 /// servicio, por lo que siguen funcionando con normalidad.
 
+/// Evento que manda Rust cuando la maquina vuelve de suspension.
+const String _kResumeEvent = 'callback_device_resumed';
+
 /// Lee el PIN de bloqueo de la app (guardado codificado en una local option).
 String getAppLockPin() {
   final raw = bind.mainGetLocalOption(key: kOptionAppLockPin);
@@ -31,10 +34,36 @@ Future<void> setAppLockPin(String pin) async {
   await bind.mainSetLocalOption(
       key: kOptionAppLockPin,
       value: pin.isEmpty ? '' : base64Encode(utf8.encode(pin)));
+  markAppLockAsked();
 }
 
 /// True si hay un PIN de bloqueo de la app configurado.
 bool isAppLockEnabled() => getAppLockPin().isNotEmpty;
+
+/// Reanudaciones de Windows detectadas por Rust (vuelta de suspension).
+int getAppLockResumeCount() =>
+    int.tryParse(bind.mainGetLocalOption(key: kOptionAppLockResumeCount)) ?? 0;
+
+void bumpAppLockResumeCount() {
+  bind.mainSetLocalOption(
+      key: kOptionAppLockResumeCount,
+      value: (getAppLockResumeCount() + 1).toString());
+}
+
+/// Valor de la cuenta de reanudaciones cuando se ingreso el PIN por ultima vez;
+/// -1 si nunca se ingreso.
+int getAppLockAskedCount() =>
+    int.tryParse(bind.mainGetLocalOption(key: kOptionAppLockAskedCount)) ?? -1;
+
+void markAppLockAsked() {
+  bind.mainSetLocalOption(
+      key: kOptionAppLockAskedCount, value: getAppLockResumeCount().toString());
+}
+
+/// True si el PIN ya se ingreso desde el ultimo inicio de Windows o vuelta de
+/// suspension, para no pedirlo todo el tiempo en el uso diario.
+bool appLockPinAlreadyAsked() =>
+    getAppLockAskedCount() == getAppLockResumeCount();
 
 /// Diálogo para definir/cambiar/quitar el PIN de bloqueo de la app.
 /// Dejar el campo vacío elimina el bloqueo.
@@ -106,13 +135,19 @@ class _PinLockGateState extends State<PinLockGate> {
   String _correctPin = '';
   bool _unlocked = true;
   String? _error;
+  String? _resumeHandler;
 
   @override
   void initState() {
     super.initState();
     _correctPin = getAppLockPin();
-    // Si no hay PIN configurado, no se bloquea la aplicación.
-    _unlocked = _correctPin.isEmpty;
+    // Sin PIN configurado no se bloquea nunca. Con PIN, se pide al iniciar
+    // Windows o al volver de suspension, no en cada apertura de la app.
+    _unlocked = _correctPin.isEmpty || appLockPinAlreadyAsked();
+    _resumeHandler = 'pin_lock_${DateTime.now().microsecondsSinceEpoch}';
+    platformFFI.registerEventHandler(
+        _kResumeEvent, _resumeHandler!, (evt) async => _onResumed());
+    bind.mainStartResumeWatcher();
     if (!_unlocked) {
       _bringToFront();
     }
@@ -125,7 +160,10 @@ class _PinLockGateState extends State<PinLockGate> {
     if (!isDesktop) return;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
+        // La ventana puede haber quedado oculta (opacity 0 + minimizada + hide).
+        await windowManager.restore();
         await windowManager.show();
+        await windowManager.setOpacity(1);
         await windowManager.focus();
         await windowManager.setAlwaysOnTop(true);
       } catch (_) {}
@@ -139,13 +177,25 @@ class _PinLockGateState extends State<PinLockGate> {
 
   @override
   void dispose() {
+    if (_resumeHandler != null) {
+      platformFFI.unregisterEventHandler(_kResumeEvent, _resumeHandler!);
+    }
     _controller.dispose();
     super.dispose();
+  }
+
+  // Vuelta de suspension de Windows: se vuelve a pedir el PIN.
+  void _onResumed() {
+    bumpAppLockResumeCount();
+    if (_correctPin.isEmpty || !_unlocked) return;
+    setState(() => _unlocked = false);
+    _bringToFront();
   }
 
   void _submit() {
     if (_controller.text.trim() == _correctPin) {
       _releaseForeground();
+      markAppLockAsked();
       setState(() {
         _unlocked = true;
         _error = null;
