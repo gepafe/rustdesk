@@ -642,50 +642,51 @@ abstract class BasePeerCard extends StatelessWidget {
           },
           dismissOnClicked: true,
         ),
-        MenuEntryButton<String>(
-          childBuilder: (TextStyle? style) => Container(
-              alignment: AlignmentDirectional.center,
-              height: CustomPopupMenuTheme.height,
-              child: Row(
-                children: [
-                  Text('RDP', style: style),
-                  Expanded(
-                      child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Transform.scale(
-                        scale: 0.8,
-                        child: IconButton(
-                          icon: const Icon(Icons.edit),
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            if (Navigator.canPop(context)) {
-                              Navigator.pop(context);
-                            }
-                            _rdpDialog(peer.id);
-                          },
-                        )),
-                  ))
-                ],
-              )),
-          proc: () async {
-            // Conexion RDP frecuente: si ya hay credenciales guardadas conecta
-            // directo; si no, las pide una vez y las guarda.
-            final username =
-                await bind.mainGetPeerOption(id: peer.id, key: 'rdp_username');
-            final password =
-                await bind.mainGetPeerOption(id: peer.id, key: 'rdp_password');
-            if (username.isNotEmpty || password.isNotEmpty) {
-              connectInPeerTab(context, peer, tab, isRDP: true);
-              return;
-            }
-            _rdpDialog(
-              peer.id,
-              onDone: (port, user, password) =>
-                  connectInPeerTab(context, peer, tab, isRDP: true),
-            );
-          },
-          dismissOnClicked: true,
-        ),
+        if (isWindows)
+          MenuEntryButton<String>(
+            childBuilder: (TextStyle? style) => Container(
+                alignment: AlignmentDirectional.center,
+                height: CustomPopupMenuTheme.height,
+                child: Row(
+                  children: [
+                    Text('RDP', style: style),
+                    Expanded(
+                        child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Transform.scale(
+                          scale: 0.8,
+                          child: IconButton(
+                            icon: const Icon(Icons.edit),
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              if (Navigator.canPop(context)) {
+                                Navigator.pop(context);
+                              }
+                              _rdpDialog(peer.id);
+                            },
+                          )),
+                    ))
+                  ],
+                )),
+            proc: () async {
+              // Conexion RDP frecuente: si ya hay credenciales guardadas conecta
+              // directo; si no, las pide una vez y las guarda.
+              final username = await bind.mainGetPeerOption(
+                  id: peer.id, key: 'rdp_username');
+              final password = await bind.mainGetPeerOption(
+                  id: peer.id, key: 'rdp_password');
+              if (username.isNotEmpty || password.isNotEmpty) {
+                connectInPeerTab(context, peer, tab, isRDP: true);
+                return;
+              }
+              _rdpDialog(
+                peer.id,
+                onDone: (port, user, password) =>
+                    connectInPeerTab(context, peer, tab, isRDP: true),
+              );
+            },
+            dismissOnClicked: true,
+          ),
         if (isWindows)
           MenuEntryButton<String>(
             childBuilder: (TextStyle? style) =>
