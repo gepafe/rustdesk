@@ -282,6 +282,11 @@ void runMultiWindow(
   }
   // show window from hidden status
   WindowController.fromWindowId(kWindowId!).show();
+  if (appType == kAppTypeDesktopPortForward) {
+    // La ventana del tunel ("Escuchando") arranca minimizada: si queda delante
+    // tapa el dialogo de usuario y contrasena que se abre en la ventana principal.
+    await WindowController.fromWindowId(kWindowId!).minimize();
+  }
 }
 
 void runConnectionManagerScreen() async {
