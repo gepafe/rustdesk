@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -63,6 +64,7 @@ class _PortForwardPageState extends State<PortForwardPage>
   RxList<_PortForward> pfs = RxList.empty(growable: true);
   late FFI _ffi;
   String? _rdpClosedHandler;
+  Timer? _rdpWatch;
 
   @override
   void initState() {
@@ -86,6 +88,15 @@ class _PortForwardPageState extends State<PortForwardPage>
           widget.tabController.closeBy(widget.id);
         }
       });
+      // Red de seguridad: si mstsc ya no existe (lo cerro el usuario), se
+      // cierra la pestana aunque el aviso del tunel no haya llegado.
+      _rdpWatch = Timer.periodic(const Duration(seconds: 3), (timer) async {
+        final state = await bind.mainRdpProcessState(id: widget.id);
+        if (state == 2) {
+          timer.cancel();
+          widget.tabController.closeBy(widget.id);
+        }
+      });
     }
     // Call onSelected in post frame callback, since we cannot guarantee that the callback will not call setState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,6 +106,7 @@ class _PortForwardPageState extends State<PortForwardPage>
 
   @override
   void dispose() {
+    _rdpWatch?.cancel();
     if (_rdpClosedHandler != null) {
       platformFFI.unregisterEventHandler(_kRdpClosedEvent, _rdpClosedHandler!);
     }

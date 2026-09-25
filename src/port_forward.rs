@@ -34,7 +34,7 @@ fn clear_rdp_credentials(port: u16) {
     }
 }
 
-fn run_rdp(port: u16, name: &str) {
+fn run_rdp(port: u16, name: &str, id: &str) {
     // mstsc reads the saved credential under the TERMSRV/ target, not the bare
     // host name, so a plain "localhost" entry is never picked up and the user
     // is asked for the password again.
@@ -67,10 +67,15 @@ fn run_rdp(port: u16, name: &str) {
         .spawn()
     {
         Ok(child) => {
+            // Se guarda el PID de mstsc para que la UI pueda detectar que la
+            // ventana de RDP se cerro, sin depender del aviso del tunel.
             #[cfg(windows)]
-            crate::platform::set_rdp_window_title(child, name.to_owned());
+            {
+                crate::platform::track_rdp_process(id, child.id());
+                crate::platform::set_rdp_window_title(child, name.to_owned());
+            }
             #[cfg(not(windows))]
-            let _ = (child, name);
+            let _ = (child, name, id);
         }
         Err(err) => log::warn!("Failed to launch mstsc: {}", err),
     }
@@ -110,7 +115,7 @@ pub async fn listen(
     log::info!("listening on port {:?}", addr);
     let is_rdp = port == 0;
     if is_rdp {
-        run_rdp(addr.port(), &rdp_display_name(&lc, &id));
+        run_rdp(addr.port(), &rdp_display_name(&lc, &id), &id);
     }
     let mut ui_receiver = ui_receiver;
     // One tunnel per mapping; the listener drops it on its way out, and that
@@ -177,7 +182,7 @@ pub async fn listen(
                     }
                     Some(Data::NewRDP) => {
                         println!("receive run_rdp from ui_receiver");
-                        run_rdp(addr.port(), &rdp_display_name(&lc, &id));
+                        run_rdp(addr.port(), &rdp_display_name(&lc, &id), &id);
                     }
                     _ => {}
                 }
@@ -204,10 +209,11 @@ fn notify_rdp_closed(id: &str) {
         ]);
         // El aviso va al canal de la ventana del tunel ("port forward"): si se
         // publica en "main" la ventana del tunel nunca lo recibe.
-        let _ = crate::flutter::push_global_event(
+        let sent = crate::flutter::push_global_event(
             crate::flutter::APP_TYPE_DESKTOP_PORT_FORWARD,
             serde_json::ser::to_string(&data).unwrap_or_default(),
         );
+        log::info!("rdp closed id={} notify sent={:?}", id, sent);
     }
     #[cfg(not(feature = "flutter"))]
     let _ = id;

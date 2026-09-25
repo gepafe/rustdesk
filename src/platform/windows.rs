@@ -2777,6 +2777,61 @@ pub fn enable_rdp_save_credentials() {
     }
 }
 
+static RDP_PROCESSES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, u32>>> =
+    std::sync::OnceLock::new();
+
+fn rdp_processes() -> &'static std::sync::Mutex<std::collections::HashMap<String, u32>> {
+    RDP_PROCESSES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Guarda el PID de mstsc para poder consultar despues si sigue vivo.
+pub fn track_rdp_process(id: &str, pid: u32) {
+    if let Ok(mut map) = rdp_processes().lock() {
+        map.insert(id.to_owned(), pid);
+    }
+}
+
+/// 0 = no hay RDP lanzado para ese equipo, 1 = mstsc sigue vivo, 2 = mstsc termino.
+pub fn rdp_process_state(id: &str) -> i32 {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenProcess(
+            desired_access: u32,
+            inherit_handle: i32,
+            process_id: u32,
+        ) -> *mut std::ffi::c_void;
+        fn WaitForSingleObject(handle: *mut std::ffi::c_void, milliseconds: u32) -> u32;
+        fn CloseHandle(object: *mut std::ffi::c_void) -> i32;
+    }
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    const WAIT_TIMEOUT: u32 = 258;
+    let pid = match rdp_processes().lock() {
+        Ok(map) => match map.get(id) {
+            Some(pid) => *pid,
+            None => return 0,
+        },
+        Err(_) => return 0,
+    };
+    let alive = unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, 0, pid);
+        if handle.is_null() {
+            false
+        } else {
+            let ret = WaitForSingleObject(handle, 0);
+            CloseHandle(handle);
+            ret == WAIT_TIMEOUT
+        }
+    };
+    if alive {
+        1
+    } else {
+        if let Ok(mut map) = rdp_processes().lock() {
+            map.remove(id);
+        }
+        2
+    }
+}
+
 // This only changes mstsc's top-level window title. The full-screen connection
 // bar is rendered separately and cannot be customized when mstsc.exe is
 // launched as an independent process.

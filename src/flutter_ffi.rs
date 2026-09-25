@@ -2202,6 +2202,18 @@ pub fn main_start_resume_watcher() {
     crate::platform::windows::spawn_resume_watcher();
 }
 
+pub fn main_rdp_process_state(id: String) -> i32 {
+    #[cfg(windows)]
+    {
+        crate::platform::rdp_process_state(&id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = id;
+        0
+    }
+}
+
 pub fn main_export_config_backup() -> String {
     crate::backup::export()
 }
