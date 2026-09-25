@@ -2753,98 +2753,33 @@ pub fn wide_string(s: &str) -> Vec<u16> {
         .collect()
 }
 
+/// Re-habilita el tilde "recordar mis credenciales" del cliente de escritorio
+/// remoto (mstsc), que Windows apaga con la politica DisablePasswordSaving.
+pub fn enable_rdp_save_credentials() {
+    for key in [
+        r"HKCU\Software\Microsoft\Terminal Server Client",
+        r"HKCU\Software\Policies\Microsoft\Windows NT\Terminal Services",
+    ] {
+        allow_err!(std::process::Command::new("reg")
+            .args([
+                "add",
+                key,
+                "/v",
+                "DisablePasswordSaving",
+                "/t",
+                "REG_DWORD",
+                "/d",
+                "0",
+                "/f",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output());
+    }
+}
+
 // This only changes mstsc's top-level window title. The full-screen connection
 // bar is rendered separately and cannot be customized when mstsc.exe is
 // launched as an independent process.
-/// Genera un .rdp temporal con la contrasena cifrada con DPAPI (igual que el
-/// cliente de escritorio remoto) para que mstsc conecte sin pedir credenciales.
-pub fn write_rdp_file(port: u16, username: &str, password: &str) -> ResultType<std::path::PathBuf> {
-    let hex = protect_password(password)?;
-    let path = rdp_file_path(port);
-    let content = format!(
-        "full address:s:localhost:{port}\r\n\
-         username:s:{username}\r\n\
-         password 51:b:{hex}\r\n\
-         prompt for credentials:i:0\r\n\
-         promptcredentialonce:i:0\r\n\
-         authentication level:i:2\r\n\
-         enablecredsspsupport:i:1\r\n\
-         negotiate security layer:i:1\r\n\
-         redirectclipboard:i:1\r\n\
-         audiomode:i:0\r\n\
-         screen mode id:i:1\r\n\
-         use multimon:i:0\r\n"
-    );
-    std::fs::write(&path, content)?;
-    Ok(path)
-}
-
-pub fn remove_rdp_file(port: u16) {
-    allow_err!(std::fs::remove_file(rdp_file_path(port)));
-}
-
-fn rdp_file_path(port: u16) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("rustdesk_rdp_{}.rdp", port))
-}
-
-/// La contrasena del .rdp va cifrada con DPAPI, con la descripcion "ps" que usa
-/// el propio Windows, y en hexadecimal.
-fn protect_password(password: &str) -> ResultType<String> {
-    #[link(name = "crypt32")]
-    extern "system" {
-        fn CryptProtectData(
-            data_in: *mut Blob,
-            descr: *const u16,
-            entropy: *mut Blob,
-            reserved: *mut u8,
-            prompt: *mut u8,
-            flags: u32,
-            data_out: *mut Blob,
-        ) -> i32;
-    }
-    #[link(name = "kernel32")]
-    extern "system" {
-        fn LocalFree(mem: *mut u8) -> *mut u8;
-    }
-    // DATA_BLOB
-    #[repr(C)]
-    struct Blob {
-        cb_data: u32,
-        pb_data: *mut u8,
-    }
-
-    let mut data = password.as_bytes().to_vec();
-    let mut data_in = Blob {
-        cb_data: data.len() as u32,
-        pb_data: data.as_mut_ptr(),
-    };
-    let mut data_out = Blob {
-        cb_data: 0,
-        pb_data: std::ptr::null_mut(),
-    };
-    let descr: Vec<u16> = "ps\0".encode_utf16().collect();
-    let ok = unsafe {
-        CryptProtectData(
-            &mut data_in,
-            descr.as_ptr(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            1, // CRYPTPROTECT_UI_FORBIDDEN
-            &mut data_out,
-        )
-    };
-    if ok == 0 {
-        bail!("CryptProtectData failed");
-    }
-    let hex = unsafe { std::slice::from_raw_parts(data_out.pb_data, data_out.cb_data as usize) }
-        .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect();
-    unsafe { LocalFree(data_out.pb_data) };
-    Ok(hex)
-}
-
 pub fn set_rdp_window_title(mut child: std::process::Child, name: String) {
     let name: String = name.chars().filter(|c| !c.is_control()).take(120).collect();
     if name.is_empty() {
