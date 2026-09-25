@@ -928,6 +928,14 @@ jobs:
       - name: create unsigned dmg
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
+          if [ -z "${{ secrets.MACOS_P12_BASE64 }}" ]; then
+            ENT="./flutter/macos/Runner/Release.entitlements"
+            if [ -f "$ENT" ]; then
+              codesign --force --deep --sign - --entitlements "$ENT" ./flutter/build/macos/Build/Products/Release/RustDesk.app
+            else
+              codesign --force --deep --sign - ./flutter/build/macos/Build/Products/Release/RustDesk.app
+            fi
+          fi
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
