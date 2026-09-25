@@ -64,7 +64,13 @@ class _PortForwardTabPageState extends State<PortForwardTabPage> {
         final args = jsonDecode(call.arguments);
         final id = args['id'];
         final isRDP = args['isRDP'];
-        windowOnTop(windowId());
+        // La ventana del tunel RDP se mantiene minimizada para no tapar el
+        // dialogo de usuario y contrasena que se abre en la ventana principal.
+        if (isRDP && isWindows) {
+          WindowController.fromWindowId(windowId()).minimize();
+        } else {
+          windowOnTop(windowId());
+        }
         if (tabController.state.value.tabs.indexWhere((e) => e.key == id) >=
             0) {
           debugPrint("port forward $id exists");
