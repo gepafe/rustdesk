@@ -32,6 +32,8 @@ fn clear_rdp_credentials(port: u16) {
             .output()
             .ok();
     }
+    #[cfg(windows)]
+    crate::platform::remove_rdp_file(port);
 }
 
 fn run_rdp(port: u16, name: &str) {
@@ -56,11 +58,27 @@ fn run_rdp(port: u16, name: &str) {
                 .ok();
         }
     }
-    // Keep using /v instead of a generated .rdp file: mstsc then preserves the
-    // user's Default.rdp settings and avoids unsigned-file warnings or policies.
-    match std::process::Command::new("mstsc")
-        .arg(format!("/v:localhost:{}", port))
-        .spawn()
+    // Con usuario y contrasena guardados se genera un .rdp temporal con la
+    // contrasena cifrada (DPAPI): mstsc conecta directo, sin pedir nada.
+    // Si algo falla se vuelve al /v: de siempre (mstsc pide las credenciales).
+    #[cfg(windows)]
+    let rdp_file = if !username.is_empty() && !password.is_empty() {
+        crate::platform::write_rdp_file(port, &username, &password).ok()
+    } else {
+        None
+    };
+    #[cfg(not(windows))]
+    let rdp_file: Option<std::path::PathBuf> = None;
+    let mut mstsc = std::process::Command::new("mstsc");
+    match &rdp_file {
+        Some(path) => {
+            mstsc.arg(path);
+        }
+        None => {
+            mstsc.arg(format!("/v:localhost:{}", port));
+        }
+    }
+    match mstsc.spawn()
     {
         Ok(child) => {
             #[cfg(windows)]
