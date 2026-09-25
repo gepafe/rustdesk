@@ -1,11 +1,34 @@
-use std::{fs, thread, time::Duration};
+use std::{fs, path::Path, path::PathBuf, thread, time::Duration};
 
 use hbb_common::{config::Config, log, ResultType};
 
-fn config_dir() -> Option<std::path::PathBuf> {
+fn config_dir() -> Option<PathBuf> {
     Config::path("RustDesk.toml")
         .parent()
         .map(|p| p.to_path_buf())
+}
+
+fn collect_files(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = match path
+            .strip_prefix(base)
+            .ok()
+            .and_then(|p| p.to_str())
+        {
+            Some(name) => name.replace('\\', "/"),
+            None => continue,
+        };
+        if path.is_dir() {
+            collect_files(&path, base, out);
+        } else if path.is_file() {
+            out.push((name, path));
+        }
+    }
 }
 
 /// Exporta toda la configuracion local (equipos, carpetas, opciones y claves) como texto.
@@ -24,22 +47,18 @@ fn do_export() -> ResultType<String> {
         Some(dir) => dir,
         None => return Ok(Default::default()),
     };
+    let mut entries = Vec::new();
+    collect_files(&dir, &dir, &mut entries);
     let mut files = serde_json::Map::new();
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        if !path.is_file() {
-            continue;
-        }
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            let data = fs::read(&path)?;
-            files.insert(
-                name.to_owned(),
-                serde_json::Value::String(crate::common::encode64(data)),
-            );
-        }
+    for (name, path) in entries {
+        let data = fs::read(&path)?;
+        files.insert(
+            name,
+            serde_json::Value::String(crate::common::encode64(data)),
+        );
     }
     let data = serde_json::json!({
-        "version": 1,
+        "version": 2,
         "files": files,
     });
     Ok(data.to_string())
@@ -56,6 +75,14 @@ pub fn import(data: &str) -> i32 {
     }
 }
 
+fn valid_name(name: &str) -> bool {
+    if name.is_empty() || name.starts_with('/') || name.starts_with('\\') || name.contains(':') {
+        return false;
+    }
+    name.split('/')
+        .all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
 fn do_import(data: &str) -> ResultType<i32> {
     let value: serde_json::Value = serde_json::from_str(data)?;
     let files = match value.get("files").and_then(|f| f.as_object()) {
@@ -68,7 +95,7 @@ fn do_import(data: &str) -> ResultType<i32> {
     };
     let mut count = 0;
     for (name, value) in files {
-        if name.is_empty() || name.starts_with('.') || name.contains('/') || name.contains('\\') {
+        if !valid_name(name) {
             continue;
         }
         let content = match value.as_str() {
@@ -82,7 +109,14 @@ fn do_import(data: &str) -> ResultType<i32> {
                 continue;
             }
         };
-        fs::write(dir.join(name.as_str()), bytes)?;
+        let path = dir.join(name.as_str());
+        if let Some(parent) = path.parent() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                log::error!("cannot create {:?}: {}", parent, e);
+                continue;
+            }
+        }
+        fs::write(&path, bytes)?;
         count += 1;
     }
     Ok(count)
