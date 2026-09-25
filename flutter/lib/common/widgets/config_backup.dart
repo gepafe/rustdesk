@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +13,13 @@ Future<void> showExportConfigBackupDialog(BuildContext context) async {
     return;
   }
   if (!context.mounted) return;
+  var count = 0;
+  try {
+    final files = (jsonDecode(data) as Map)['files'];
+    if (files is Map) {
+      count = files.length;
+    }
+  } catch (_) {}
   final controller = TextEditingController(text: data);
   showDialog(
     context: context,
@@ -22,9 +31,9 @@ Future<void> showExportConfigBackupDialog(BuildContext context) async {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                  'Copiá este texto y guardalo donde quieras (Google Drive, Notas, un mensaje a vos mismo). Con esto se recuperan los equipos, carpetas y toda la configuración.',
-                  style: TextStyle(fontSize: 12)),
+              Text(
+                  'Copia completa ($count partes): equipos, carpetas, orden personalizado, claves y ajustes.\nCopiá este texto y guardalo donde quieras (Drive, Notas, un mensaje a vos mismo).',
+                  style: const TextStyle(fontSize: 12)),
               const SizedBox(height: 8),
               Expanded(
                   child: TextField(
