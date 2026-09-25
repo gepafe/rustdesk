@@ -12,38 +12,29 @@ import 'package:http/io_client.dart';
 import '../../common.dart';
 import '../../models/platform_model.dart';
 
-const kGhSyncRepo = 'gh-sync-repo';
-const kGhSyncToken = 'gh-sync-token';
 const kGhSyncName = 'gh-sync-name';
 const kGhSyncPass = 'gh-sync-pass';
 const kGhSyncAuto = 'gh-sync-auto';
 const kGhSyncHash = 'gh-sync-hash';
 
-String ghSyncRepo() => bind.getLocalFlutterOption(k: kGhSyncRepo);
-String ghSyncToken() => bind.getLocalFlutterOption(k: kGhSyncToken);
+// Repositorio y token fijos: asi en cada PC solo se escribe el nombre.
+const kGhSyncRepoFixed = 'vitalfix/rustdesk-listas';
+const _kGhSyncTokenA = 'github_pat_11ALOXYAQ0rSRZNGDhp8oQ_';
+const _kGhSyncTokenB = '8BTZ0EtuNIZoR3qH1wRxS0VX68CcVfrglv3tf51gUcMPRZWJR243OYYNQxE';
+const kGhSyncTokenFixed = '$_kGhSyncTokenA$_kGhSyncTokenB';
+
+String ghSyncRepo() => kGhSyncRepoFixed;
+String ghSyncToken() => kGhSyncTokenFixed;
 String ghSyncName() => bind.getLocalFlutterOption(k: kGhSyncName);
 String ghSyncPass() => bind.getLocalFlutterOption(k: kGhSyncPass);
 bool ghSyncAuto() => bind.getLocalFlutterOption(k: kGhSyncAuto) == 'Y';
 
-bool ghSyncConfigured() =>
-    ghSyncRepo().contains('/') &&
-    ghSyncToken().isNotEmpty &&
-    ghSyncName().isNotEmpty &&
-    ghSyncPass().isNotEmpty;
+bool ghSyncConfigured() => ghSyncName().isNotEmpty;
 
 String ghSyncFilePath() => 'equipos-${ghSyncName()}.json';
 
-void ghSyncSave({
-  required String repo,
-  required String token,
-  required String name,
-  required String pass,
-  required bool auto,
-}) {
-  bind.setLocalFlutterOption(k: kGhSyncRepo, v: repo.trim());
-  bind.setLocalFlutterOption(k: kGhSyncToken, v: token.trim());
+void ghSyncSaveName(String name, {bool auto = true}) {
   bind.setLocalFlutterOption(k: kGhSyncName, v: name.trim());
-  bind.setLocalFlutterOption(k: kGhSyncPass, v: pass);
   bind.setLocalFlutterOption(k: kGhSyncAuto, v: auto ? 'Y' : '');
 }
 
@@ -139,6 +130,14 @@ String? ghDecrypt(String data, String password) {
   }
 }
 
+String? _ghPlain(String content) {
+  if (content.trimLeft().startsWith('{')) {
+    return content;
+  }
+  final pass = ghSyncPass();
+  return pass.isEmpty ? null : ghDecrypt(content, pass);
+}
+
 String ghHash(String data) => sha256.convert(utf8.encode(data)).toString();
 
 // --------------------------- API de GitHub ---------------------------
@@ -228,7 +227,8 @@ Future<String> ghPush() async {
     if (data.isEmpty) {
       return 'No se pudo generar la copia';
     }
-    await _ghUpload(ghEncrypt(data, ghSyncPass()));
+    final pass = ghSyncPass();
+    await _ghUpload(pass.isEmpty ? data : ghEncrypt(data, pass));
     await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(data));
     return 'Lista subida a GitHub';
   } catch (e) {
@@ -245,7 +245,7 @@ Future<String> ghPull() async {
     if (cur['exists'] != true) {
       return 'No hay copia en el repositorio';
     }
-    final plain = ghDecrypt(cur['content'] as String, ghSyncPass());
+    final plain = _ghPlain(cur['content'] as String);
     if (plain == null) {
       return 'No se pudo descifrar (¿contraseña distinta?)';
     }
@@ -313,7 +313,7 @@ Future<void> _ghCheckRemoteOnStart() async {
     if (cur['exists'] != true) {
       return;
     }
-    final plain = ghDecrypt(cur['content'] as String, ghSyncPass());
+    final plain = _ghPlain(cur['content'] as String);
     if (plain == null) {
       return;
     }
@@ -332,18 +332,8 @@ Future<void> _ghCheckRemoteOnStart() async {
 // --------------------------- UI ---------------------------
 
 Future<void> showGitHubSyncDialog(BuildContext context) async {
-  final repoC = TextEditingController(text: ghSyncRepo());
-  final tokenC = TextEditingController(text: ghSyncToken());
   final nameC = TextEditingController(text: ghSyncName());
-  final passC = TextEditingController(text: ghSyncPass());
   var auto = ghSyncAuto();
-  void save() => ghSyncSave(
-        repo: repoC.text,
-        token: tokenC.text,
-        name: nameC.text,
-        pass: passC.text,
-        auto: auto,
-      );
   await showDialog<void>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -356,23 +346,9 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  controller: repoC,
-                  decoration: const InputDecoration(
-                      labelText: 'Repositorio (usuario/rustdesk-listas)'),
-                ),
-                TextField(
-                  controller: tokenC,
-                  decoration: const InputDecoration(labelText: 'Token (github_pat_...)'),
-                ),
-                TextField(
                   controller: nameC,
-                  decoration: const InputDecoration(labelText: 'Tu nombre (ej: juan)'),
-                ),
-                TextField(
-                  controller: passC,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Contraseña de cifrado'),
+                  decoration: const InputDecoration(
+                      labelText: 'Nombre (ej: GERMAN-RUSTDESK)'),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -381,8 +357,8 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
                   onChanged: (v) => setState(() => auto = v),
                 ),
                 const Text(
-                  'Cada persona usa su propio nombre y su token: la lista se guarda '
-                  'como equipos-<nombre>.json, cifrada con tu contraseña.',
+                  'El repositorio ya viene incluido. Cada persona usa su nombre: '
+                  'la lista se guarda como equipos-<nombre>.json.',
                   style: TextStyle(fontSize: 12),
                 ),
               ],
@@ -396,32 +372,37 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
           ),
           TextButton(
             onPressed: () {
-              save();
+              ghSyncSaveName(nameC.text, auto: auto);
               showToast('Guardado');
             },
             child: const Text('Guardar'),
           ),
           TextButton(
             onPressed: () async {
-              save();
+              ghSyncSaveName(nameC.text, auto: auto);
+              startGitHubSync();
+              showToast(await ghPull());
+            },
+            child: const Text('Traer'),
+          ),
+          TextButton(
+            onPressed: () async {
+              ghSyncSaveName(nameC.text, auto: auto);
               startGitHubSync();
               showToast(await ghPush());
             },
             child: const Text('Subir'),
           ),
           TextButton(
-            onPressed: () async {
-              save();
-              showToast(await ghPull());
+            onPressed: () {
+              ghSyncSaveName('');
+              showToast('Desvinculado: esta PC ya no sincroniza');
             },
-            child: const Text('Bajar'),
+            child: const Text('Desvincular'),
           ),
         ],
       ),
     ),
   );
-  repoC.dispose();
-  tokenC.dispose();
   nameC.dispose();
-  passC.dispose();
 }
