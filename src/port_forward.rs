@@ -202,8 +202,10 @@ fn notify_rdp_closed(id: &str) {
             ("name", "callback_rdp_closed".to_owned()),
             ("id", id.to_owned()),
         ]);
+        // El aviso va al canal de la ventana del tunel ("port forward"): si se
+        // publica en "main" la ventana del tunel nunca lo recibe.
         let _ = crate::flutter::push_global_event(
-            crate::flutter::APP_TYPE_MAIN,
+            crate::flutter::APP_TYPE_DESKTOP_PORT_FORWARD,
             serde_json::ser::to_string(&data).unwrap_or_default(),
         );
     }

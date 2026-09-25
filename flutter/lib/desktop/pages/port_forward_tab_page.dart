@@ -71,18 +71,13 @@ class _PortForwardTabPageState extends State<PortForwardTabPage> {
         } else {
           windowOnTop(windowId());
         }
-        if (tabController.state.value.tabs.indexWhere((e) => e.key == id) >=
-            0) {
-          debugPrint("port forward $id exists");
-          return;
-        }
-        tabController.add(TabInfo(
+        final tab = TabInfo(
             key: id,
             label: id,
             selectedIcon: selectedIcon,
             unselectedIcon: unselectedIcon,
             page: PortForwardPage(
-              key: ValueKey(args['id']),
+              key: ValueKey('$id-${DateTime.now().microsecondsSinceEpoch}'),
               id: id,
               password: args['password'],
               isSharedPassword: args['isSharedPassword'],
@@ -90,7 +85,20 @@ class _PortForwardTabPageState extends State<PortForwardTabPage> {
               tabController: tabController,
               forceRelay: args['forceRelay'],
               connToken: args['connToken'],
-            )));
+            ));
+        final index =
+            tabController.state.value.tabs.indexWhere((e) => e.key == id);
+        if (index >= 0) {
+          // Red de seguridad: si quedo una pestaña vieja de ese equipo, se
+          // reemplaza por una nueva para que la conexion arranque de cero (no
+          // se usa remove() porque cerraria la ventana si era la unica).
+          tabController.state.update((val) {
+            val!.tabs[index] = tab;
+          });
+          tabController.jumpTo(index);
+        } else {
+          tabController.add(tab);
+        }
       } else if (call.method == "onDestroy") {
         tabController.clear();
       } else if (call.method == kWindowActionRebuild) {
