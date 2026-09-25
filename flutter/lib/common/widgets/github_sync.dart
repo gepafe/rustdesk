@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import '../../common.dart';
 import '../../models/platform_model.dart';
@@ -151,8 +153,41 @@ Map<String, String> _ghHeaders() => {
 Uri _ghUri() =>
     Uri.parse('https://api.github.com/repos/${ghSyncRepo()}/contents/${ghSyncFilePath()}');
 
+bool _ghInsecure = false;
+
+Future<http.Response> _ghRequest(
+  String method,
+  Uri uri,
+  Map<String, String> headers, {
+  String? body,
+}) async {
+  Future<http.Response> run({required bool insecure}) {
+    if (!insecure) {
+      return method == 'GET'
+          ? http.get(uri, headers: headers)
+          : http.put(uri, headers: headers, body: body);
+    }
+    final client = IOClient(
+        HttpClient()..badCertificateCallback = (cert, host, port) => true);
+    return method == 'GET'
+        ? client.get(uri, headers: headers)
+        : client.put(uri, headers: headers, body: body);
+  }
+
+  if (!_ghInsecure) {
+    try {
+      return await run(insecure: false);
+    } on HandshakeException {
+      _ghInsecure = true;
+      showToast(
+          'No se pudo verificar el certificado HTTPS (antivirus o proxy). Se conecta igual.');
+    }
+  }
+  return run(insecure: true);
+}
+
 Future<Map<String, dynamic>> _ghDownload() async {
-  final resp = await http.get(_ghUri(), headers: _ghHeaders());
+  final resp = await _ghRequest('GET', _ghUri(), _ghHeaders());
   if (resp.statusCode == 404) {
     return {'exists': false};
   }
@@ -176,7 +211,7 @@ Future<void> _ghUpload(String content) async {
     'content': base64Encode(utf8.encode(content)),
     if (sha != null) 'sha': sha,
   });
-  final resp = await http.put(_ghUri(), headers: _ghHeaders(), body: body);
+  final resp = await _ghRequest('PUT', _ghUri(), _ghHeaders(), body: body);
   if (resp.statusCode != 200 && resp.statusCode != 201) {
     throw Exception('GitHub ${resp.statusCode}');
   }
