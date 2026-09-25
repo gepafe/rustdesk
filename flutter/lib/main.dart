@@ -6,6 +6,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hbb/common/widgets/github_sync.dart';
 import 'package:flutter_hbb/common/widgets/overlay.dart';
 import 'package:flutter_hbb/common/widgets/pin_lock.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
@@ -302,6 +303,7 @@ void runConnectionManagerScreen() async {
   setResizable(false);
   // Start the uni links handler and redirect links to Native, not for Flutter.
   listenUniLinks(handleByFlutter: false);
+  startGitHubSync();
 }
 
 bool _isCmReadyToShow = false;

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/config_backup.dart';
+import 'package:flutter_hbb/common/widgets/github_sync.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:get/get.dart';
@@ -314,6 +315,10 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
           title: const Text('Importar copia de seguridad'),
           trailing: const Icon(Icons.arrow_forward_ios),
           onPressed: (context) => showImportConfigBackupDialog(context)),
+      SettingsTile(
+          title: const Text('Sincronizar con GitHub'),
+          trailing: const Icon(Icons.arrow_forward_ios),
+          onPressed: (context) => showGitHubSyncDialog(context)),
     ];
     final enable2fa = bind.mainHasValid2FaSync();
     final List<AbstractSettingsTile> tfaTiles = [

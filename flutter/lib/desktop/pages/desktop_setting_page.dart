@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/common/widgets/config_backup.dart';
+import 'package:flutter_hbb/common/widgets/github_sync.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -2609,6 +2610,11 @@ class _AboutState extends State<_About> {
               InkWell(
                   onTap: () => showImportConfigBackupDialog(context),
                   child: const Text('Importar copia de seguridad',
+                          style: linkStyle)
+                      .marginSymmetric(vertical: 4.0)),
+              InkWell(
+                  onTap: () => showGitHubSyncDialog(context),
+                  child: const Text('Sincronizar con GitHub',
                           style: linkStyle)
                       .marginSymmetric(vertical: 4.0)),
               InkWell(
