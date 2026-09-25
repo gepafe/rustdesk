@@ -531,6 +531,9 @@ class _PeersViewState extends State<_PeersView>
     }
 
     if (sortedBy == PeerSortType.custom) {
+      // Se lee el contador para que quien construye la lista dependa del orden
+      // guardado: al tocar las flechas de subir/bajar la lista se rearma.
+      final _ = peerOrderVersion.value;
       final order = loadPeerOrder();
       final indexOf = <String, int>{};
       for (var i = 0; i < order.length; i++) {
