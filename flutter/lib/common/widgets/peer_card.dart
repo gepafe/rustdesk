@@ -146,7 +146,6 @@ class _PeerCardState extends State<_PeerCard>
   }
 
   Widget _listRow(Peer peer, String name, TextStyle greyStyle) {
-    final sessions = _cachedWindowsSessions(peer.id);
     return Container(
       decoration: BoxDecoration(
         color: stateGlobal.isPortrait.isTrue
@@ -181,15 +180,6 @@ class _PeerCardState extends State<_PeerCard>
                       maxLines: 1,
                     ).marginOnly(left: 8),
                   ),
-                if (sessions.isNotEmpty)
-                  Flexible(
-                    child: Text(
-                      'Sesiones: $sessions',
-                      style: greyStyle,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ).marginOnly(left: 8),
-                  ),
               ],
             ),
           ),
@@ -208,8 +198,7 @@ class _PeerCardState extends State<_PeerCard>
         color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
     final showNote = _showNote(peer);
 
-    // Vista de lista: una sola linea por equipo (mas compacta) e incluye las
-    // sesiones de Windows activas, que antes solo se veian en la vista grande.
+    // Vista de lista: una sola linea por equipo (mas compacta).
     if (peerCardUiType.value == PeerUiType.list) {
       return _listRow(peer, name, greyStyle);
     }
@@ -407,14 +396,6 @@ class _PeerCardState extends State<_PeerCard>
                                   ),
                                  ],
                                ),
-                               if (_cachedWindowsSessions(peer.id).isNotEmpty)
-                                 Text(
-                                   'Sesiones: ${_cachedWindowsSessions(peer.id)}',
-                                   style: const TextStyle(
-                                       color: Colors.white70, fontSize: 10),
-                                   textAlign: TextAlign.center,
-                                   overflow: TextOverflow.ellipsis,
-                                 ),
                                if (_showNote(peer))
                                 Row(
                                   children: [
@@ -552,14 +533,6 @@ class _PeerCardState extends State<_PeerCard>
       }
     } else {
       return _actionMore(peer);
-    }
-  }
-
-  String _cachedWindowsSessions(String id) {
-    try {
-      return bind.mainGetLocalOption(key: 'windows-sessions-$id');
-    } catch (_) {
-      return '';
     }
   }
 
