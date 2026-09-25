@@ -12,6 +12,7 @@ import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
+import 'package:flutter_hbb/models/peer_folder_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -924,6 +925,13 @@ void showImportPeersBulkDialog() {
           .map((l) => l.trim())
           .where((l) => l.isNotEmpty)
           .toList();
+      if (lines.isEmpty) {
+        setState(() {
+          isInProgress = false;
+          msg = translate("No se encontraron equipos en el texto.");
+        });
+        return;
+      }
       var ok = 0;
       var skipped = 0;
       final favs = (await bind.mainGetFav()).toList();
@@ -949,13 +957,11 @@ void showImportPeersBulkDialog() {
           } catch (_) {}
         }
         // Crear la ficha local con platform no vacío; si no, RustDesk
-        // descarta el equipo y no aparece en Favoritos.
+        // descarta el equipo y no aparece en Favoritos. Sin hostname: el
+        // nombre ya lo muestra el alias y no hace falta un subtítulo repetido.
         try {
           await bind.mainSetPeerInfo(
-              id: id,
-              username: "",
-              hostname: alias.isNotEmpty ? alias : id,
-              platform: "Windows");
+              id: id, username: "", hostname: "", platform: "Windows");
         } catch (_) {}
         // Agenda: solo si hay servidor que la soporte (self-hosted).
         try {
@@ -964,22 +970,25 @@ void showImportPeersBulkDialog() {
                 id, alias, "", List<dynamic>.of([group]), "");
           }
         } catch (_) {}
+        // Carpeta local: se crea si no existe.
+        if (group.isNotEmpty) {
+          try {
+            if (peerFolderModel.folderByName(group) == null) {
+              peerFolderModel.addFolder(group, notify: false);
+            }
+            peerFolderModel.setPeerFolder(id, group);
+          } catch (_) {}
+        }
         ok++;
       }
       if (favsChanged) {
         await bind.mainStoreFav(favs: favs);
         bind.mainLoadFavPeers();
       }
-      setState(() {
-        isInProgress = false;
-        msg = "${translate("Importados")}: $ok, "
-            "${translate("omitidos")}: $skipped";
-      });
-      if (lines.isEmpty) {
-        setState(() {
-          msg = translate("No se encontraron equipos en el texto.");
-        });
-      }
+      bind.mainLoadRecentPeers();
+      showToast("${translate("Importados")}: $ok, "
+          "${translate("omitidos")}: $skipped");
+      close();
     }
 
     return CustomAlertDialog(
@@ -1031,7 +1040,9 @@ String peersBulkText(List<Peer> peers) {
       continue;
     }
     final name = p.alias.isNotEmpty ? p.alias : p.hostname;
-    lines.add([p.id, name, p.device_group_name].join(';'));
+    final folder = peerFolderModel.folderOf(p.id)?.name ?? '';
+    final group = folder.isNotEmpty ? folder : p.device_group_name;
+    lines.add([p.id, name, group].join(';'));
   }
   return lines.join('\n');
 }
