@@ -1701,6 +1701,9 @@ void applyCustomClientDefaults({bool force = false}) {
   setMain(kOptionKeepAwakeDuringIncomingSessions, 'Y');
   // Audio habilitado por defecto (voz/microfono y audio del equipo remoto).
   setMain(kOptionEnableAudio, 'Y');
+  // La version 1.5 corre WebRTC en carrera contra el camino clasico y en
+  // servidores sin cuenta falla con "The connection is not allowed.".
+  setMain('enable-webrtc', 'N');
   // Calidad de imagen optima por defecto en cada conexion.
   bind.mainSetUserDefaultOption(
       key: kOptionImageQuality, value: kRemoteImageQualityBest);

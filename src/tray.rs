@@ -13,7 +13,7 @@ pub fn start_tray() {
     // Cliente personalizado: la bandeja se muestra (asi siempre se puede reabrir
     // la ventana) y se oculta sola solo mientras una sesion te esta controlando,
     // para no dejar rastro en la PC que es accedida (ver ControlledSessionCount).
-    if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
+    if cfg!(windows) || crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
         #[cfg(not(target_os = "macos"))]
         {
             return;
