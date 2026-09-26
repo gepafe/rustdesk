@@ -252,7 +252,8 @@ Future<void> _ghTick() async {
     }
     await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(merged));
     if (ghPeersCount(merged) > ghPeersCount(local)) {
-      showToast('Hay equipos nuevos en GitHub: tocá Vincular para traerlos');
+      final msg = await ghLink();
+      showToast(msg);
     }
   } catch (_) {}
 }
@@ -276,8 +277,8 @@ Future<void> _ghCheckRemoteOnStart() async {
     }
     final merged = ghMerge(local, remote);
     if (merged != null && ghHash(merged) != ghHash(local)) {
-      showToast(
-          'Hay una lista distinta en GitHub: Ajustes → Sincronizar con GitHub → Vincular');
+      final msg = await ghLink();
+      showToast(msg);
     }
   } catch (_) {}
 }
