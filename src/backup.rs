@@ -50,16 +50,26 @@ fn do_export() -> ResultType<String> {
     let mut entries = Vec::new();
     collect_files(&dir, &dir, &mut entries);
     let mut files = serde_json::Map::new();
+    let mut mtimes = serde_json::Map::new();
     for (name, path) in entries {
         let data = fs::read(&path)?;
+        let modified = fs::metadata(&path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
         files.insert(
-            name,
+            name.clone(),
             serde_json::Value::String(crate::common::encode64(data)),
         );
+        if let Some(secs) = modified {
+            mtimes.insert(name, serde_json::json!(secs));
+        }
     }
     let data = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "files": files,
+        "mtimes": mtimes,
     });
     Ok(data.to_string())
 }
