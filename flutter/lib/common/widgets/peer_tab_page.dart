@@ -4,6 +4,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/address_book.dart';
 import 'package:flutter_hbb/common/widgets/peer_info_probe.dart';
+import 'package:flutter_hbb/common/widgets/peer_tab_actions.dart';
 import 'package:flutter_hbb/common/widgets/telegram_monitor.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/my_group.dart';
@@ -91,6 +92,21 @@ class _PeerTabPageState extends State<PeerTabPage>
         bind.mainGetLocalOption(key: kOptionHideAbTagsPanel) == 'Y';
   }
 
+  @override
+  void initState() {
+    super.initState();
+    PeerTabActionsController.instance.register(_buildHostedActions);
+  }
+
+  @override
+  void dispose() {
+    PeerTabActionsController.instance.unregister();
+    super.dispose();
+  }
+
+  List<Widget> _buildHostedActions(BuildContext context) =>
+      _landscapeRightActions(context);
+
   Future<void> handleTabSelection(int tabIndex) async {
     if (tabIndex < entries.length) {
       if (tabIndex != gFFI.peerTabModel.currentTab) {
@@ -112,26 +128,33 @@ class _PeerTabPageState extends State<PeerTabPage>
       textBaseline: TextBaseline.ideographic,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Obx(() => SizedBox(
+        Obx(() {
+          if (stateGlobal.isPortrait.isTrue) {
+            return SizedBox(
               height: 32,
               child: Container(
-                padding: stateGlobal.isPortrait.isTrue
-                    ? EdgeInsets.symmetric(horizontal: 2)
-                    : null,
+                padding: EdgeInsets.symmetric(horizontal: 2),
                 child: selectionWrap(Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                         child: visibleContextMenuListener(
                             _createSwitchBar(context))),
-                    if (stateGlobal.isPortrait.isTrue)
-                      ..._portraitRightActions(context)
-                    else
-                      ..._landscapeRightActions(context)
+                    ..._portraitRightActions(context)
                   ],
                 )),
               ),
-            ).paddingOnly(right: stateGlobal.isPortrait.isTrue ? 0 : 12)),
+            );
+          }
+          // Desktop: the tab bar (and its "recent sessions" clock) is hidden
+          // because the action buttons moved to the main window's left pane.
+          // Only the multi-selection bar keeps using this row.
+          if (!model.multiSelectionMode) return const SizedBox.shrink();
+          return SizedBox(
+            height: 32,
+            child: createMultiSelectionBar(model),
+          ).paddingOnly(right: 12);
+        }),
         _createPeersView(),
       ],
     );

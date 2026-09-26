@@ -183,8 +183,29 @@ class _PeerCardState extends State<_PeerCard>
               ],
             ),
           ),
+          if (hasRdpSaved(peer.id)) _rdpRowButton(peer),
           checkBoxOrActionMoreLandscape(peer, isTile: true),
         ],
+      ),
+    );
+  }
+
+  bool hasRdpSaved(String id) =>
+      bind.mainGetPeerOptionSync(id: id, key: 'rdp_username').isNotEmpty ||
+      bind.mainGetPeerOptionSync(id: id, key: 'rdp_password').isNotEmpty;
+
+  Widget _rdpRowButton(Peer peer) {
+    final color = Theme.of(context).colorScheme.primary;
+    return InkWell(
+      onTap: () => connectInPeerTab(context, peer, widget.tab, isRDP: true),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          border: Border.all(color: color),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text('RDP', style: TextStyle(fontSize: 10, color: color)),
       ),
     );
   }

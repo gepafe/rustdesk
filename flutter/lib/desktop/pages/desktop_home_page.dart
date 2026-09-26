@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/widgets/peer_tab_actions.dart';
 import 'package:flutter_hbb/common/widgets/peer_tab_page.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
@@ -131,7 +132,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 340.0,
+        width: isIncomingOnly ? 280.0 : 250.0,
         color: Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
@@ -144,7 +145,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     children: children,
                   ),
                 ),
-                Expanded(child: Container())
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                          left: 12,
+                          right: 12,
+                          bottom: isOutgoingOnly ? 34 : 6),
+                      child: const PeerTabActionsBar(),
+                    ),
+                  ),
+                )
               ],
             ),
             if (isOutgoingOnly)
@@ -187,8 +199,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       child: Column(
         children: [
           Expanded(child: PeerTabPage()),
-          if (!isOutgoingOnly) const Divider(height: 1),
-          if (!isOutgoingOnly) OnlineStatusWidget(),
+          // Kept mounted (hidden) so its timer keeps updating
+          // `stateGlobal.videoConnCount`, but the "Ready" status bar is gone.
+          if (!isOutgoingOnly)
+            const Offstage(offstage: true, child: OnlineStatusWidget()),
         ],
       ),
     );
