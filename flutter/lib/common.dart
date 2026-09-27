@@ -1698,7 +1698,7 @@ void applyCustomClientDefaults({bool force = false}) {
   // Se fuerza aunque ya haya un valor guardado: si queda en 'N' la ventana local
   // absorbe los clics mientras te controlan (Ajustes y conectar bloqueados) y las
   // PCs ya instaladas no tomarian el cambio.
-  bind.mainSetOptionSync(key: kOptionAllowRemoteConfigModification, value: 'Y');
+  bind.mainSetOption(key: kOptionAllowRemoteConfigModification, value: 'Y');
   setMain(kOptionEnableLanDiscovery, 'N');
   setMain(kOptionDirectxCapture, 'Y');
   setMain(kOptionEnableHwcodec, 'Y');
