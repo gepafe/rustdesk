@@ -937,12 +937,20 @@ impl InvokeUiSession for FlutterHandler {
             h.insert("name", d.name);
             msg_vec.push(h);
         }
+        let private_user = if crate::ui_interface::get_option("private-user") == "Y" {
+            "Y".to_owned()
+        } else {
+            "".to_owned()
+        };
         self.push_event(
             "set_multiple_windows_session",
-            &[(
-                "windows_sessions",
-                &serde_json::ser::to_string(&msg_vec).unwrap_or("".to_owned()),
-            )],
+            &[
+                (
+                    "windows_sessions",
+                    &serde_json::ser::to_string(&msg_vec).unwrap_or("".to_owned()),
+                ),
+                ("private_user", &private_user),
+            ],
             &[],
         );
     }

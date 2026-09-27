@@ -900,7 +900,8 @@ class FfiModel with ChangeNotifier {
     final type = "";
 
     showWindowsSessionsDialog(
-        type, title, text, dialogManager, sessionId, peerId, sessions);
+        type, title, text, dialogManager, sessionId, peerId, sessions,
+        privateUser: evt['private_user'] == 'Y');
   }
 
   /// Handle the message box event based on [evt] and [id].

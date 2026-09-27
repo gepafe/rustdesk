@@ -1421,6 +1421,8 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
         _OptionCheckBox(context, 'allow-only-conn-window-open-tip',
             'allow-only-conn-window-open',
             reverse: false, enabled: enabled),
+      _OptionCheckBox(context, 'USUARIO PRIVADO', kOptionPrivateUser,
+          enabled: enabled),
       appLockPin()
     ]);
   }

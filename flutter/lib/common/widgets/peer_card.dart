@@ -68,13 +68,13 @@ class _PeerCardState extends State<_PeerCard>
     return GestureDetector(
         onDoubleTap: peerTabModel.multiSelectionMode
             ? null
-            : () => widget.connect(context, peer.id),
+            : () => _connectControl(peer.id),
         onTap: () {
           if (peerTabModel.multiSelectionMode) {
             peerTabModel.select(peer);
           } else {
             if (isMobile) {
-              widget.connect(context, peer.id);
+              _connectControl(peer.id);
             } else {
               peerTabModel.select(peer);
             }
@@ -82,6 +82,13 @@ class _PeerCardState extends State<_PeerCard>
         },
         onLongPress: () => peerTabModel.select(peer),
         child: child);
+  }
+
+  Future<void> _connectControl(String id) async {
+    // El clic en la tarjeta siempre conecta en modo control: se limpia la marca
+    // de "solo ver" que haya quedado guardada por el item 'VER SOLAMENTE'.
+    await bind.mainSetPeerOption(id: id, key: kOptionViewOnly, value: '');
+    widget.connect(context, id);
   }
 
   Widget _buildPortrait() {

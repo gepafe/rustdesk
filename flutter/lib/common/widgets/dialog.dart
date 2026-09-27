@@ -2442,7 +2442,8 @@ void showWindowsSessionsDialog(
     OverlayDialogManager dialogManager,
     SessionID sessionId,
     String peerId,
-    String sessions) {
+    String sessions,
+    {bool privateUser = false}) {
   List<dynamic> sessionsList = [];
   try {
     sessionsList = json.decode(sessions);
@@ -2468,7 +2469,7 @@ void showWindowsSessionsDialog(
 
   // Con una sola sesion "PC..." no hace falta molestar con el dialogo: se
   // conecta directo. El resto si pasa por el dialogo (y la clave 777).
-  if (names.length == 1 && _sessionIsPc(names.first)) {
+  if (names.length == 1 && !privateUser && _sessionIsPc(names.first)) {
     dialogManager.dismissAll();
     sendSelected();
     return;
@@ -2479,7 +2480,7 @@ void showWindowsSessionsDialog(
     submit() {
       // Las sesiones cuyo usuario empieza con "PC" entran sin clave; el resto
       // pide la clave de acceso antes de conectar.
-      if (_sessionIsPc(selectedName())) {
+      if (!privateUser && _sessionIsPc(selectedName())) {
         sendSelected();
         close();
         return;
