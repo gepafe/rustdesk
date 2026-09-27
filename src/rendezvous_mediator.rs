@@ -1075,7 +1075,11 @@ impl RendezvousMediator {
         // syncs over IPC, so this (server) process would read the private-server default of "N"
         // and refuse to answer in exactly the self-hosted deployments the transport is for.
         // A proxy still rules it out — ICE would bypass it and leak the real IP.
-        let webrtc_viable = !ph.webrtc_sdp_offer.is_empty()
+        // Cliente personalizado: si WebRTC esta apagado en la configuracion, no se contesta la
+        // oferta y tampoco se toma el camino WebRTC. Un peer stock que ofrece WebRTC se quedaba
+        // sin punch clasico y reintentaba cada 1 segundo.
+        let webrtc_viable = crate::common::get_webrtc_enabled()
+            && !ph.webrtc_sdp_offer.is_empty()
             && !Config::is_proxy()
             && (!webrtc_relay_only || WebRTCStream::has_turn_server());
         let webrtc_sdp_answer = if webrtc_viable {
@@ -1159,7 +1163,7 @@ impl RendezvousMediator {
                 .await?;
             return Ok(());
         }
-        if !ph.webrtc_sdp_offer.is_empty() {
+        if webrtc_viable {
             // Return the answer over its own short-lived TCP connection rather than the mediator
             // channel: that channel is UDP by default, and hbbs applies UDP-punch semantics
             // (source-address observation) to a PunchHoleSent that arrives on it. No TCP punch
