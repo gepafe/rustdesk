@@ -2318,31 +2318,136 @@ oLink.Save
     Ok(())
 }
 
-/// Avisa a la UI cuando el equipo vuelve de suspension: si el reloj de pared
-/// salta mas que este intervalo, la maquina estuvo dormida.
+/// Avisa a la UI cuando la sesion de Windows se bloquea o desbloquea y cuando el
+/// equipo vuelve de suspension, usando las notificaciones de Windows (eventos):
+/// no hay monitoreo periodico.
 pub fn spawn_resume_watcher() {
     use std::sync::atomic::{AtomicBool, Ordering};
     static STARTED: AtomicBool = AtomicBool::new(false);
     if STARTED.swap(true, Ordering::SeqCst) {
         return;
     }
-    std::thread::spawn(move || loop {
-        let before = std::time::SystemTime::now();
-        std::thread::sleep(std::time::Duration::from_secs(5));
-        if let Ok(elapsed) = before.elapsed() {
-            if elapsed.as_secs() > 60 {
-                #[cfg(feature = "flutter")]
-                {
-                    use std::collections::HashMap;
-                    let data = HashMap::from([("name", "callback_device_resumed".to_owned())]);
-                    crate::flutter::push_global_event(
-                        crate::flutter::APP_TYPE_MAIN,
-                        serde_json::ser::to_string(&data).unwrap_or_default(),
-                    );
-                }
-            }
-        }
+    std::thread::spawn(|| unsafe {
+        resume_watcher_loop();
     });
+}
+
+unsafe fn resume_watcher_loop() {
+    use std::ffi::c_void;
+    const HWND_MESSAGE: *mut c_void = -3isize as *mut c_void;
+    const WM_POWERBROADCAST: u32 = 0x0218;
+    const PBT_APMRESUMEAUTOMATIC: usize = 0x0012;
+    const PBT_APMRESUMESUSPEND: usize = 0x0007;
+    const WM_WTSSESSION_CHANGE: u32 = 0x02B1;
+    const WTS_SESSION_LOGON: usize = 0x5;
+    const WTS_SESSION_LOGOFF: usize = 0x6;
+    const WTS_SESSION_LOCK: usize = 0x7;
+    const WTS_SESSION_UNLOCK: usize = 0x8;
+    const NOTIFY_FOR_THIS_SESSION: u32 = 0;
+    const DEVICE_NOTIFY_WINDOW_HANDLE: u32 = 0;
+
+    #[repr(C)]
+    struct Msg {
+        hwnd: *mut c_void,
+        message: u32,
+        w_param: usize,
+        l_param: isize,
+        time: u32,
+        pt_x: i32,
+        pt_y: i32,
+        l_private: u32,
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn CreateWindowExW(
+            ex_style: u32,
+            class_name: *const u16,
+            window_name: *const u16,
+            style: u32,
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            parent: *mut c_void,
+            menu: *mut c_void,
+            instance: *mut c_void,
+            param: *mut c_void,
+        ) -> *mut c_void;
+        fn DefWindowProcW(hwnd: *mut c_void, msg: u32, wparam: usize, lparam: isize) -> isize;
+        fn GetMessageW(msg: *mut Msg, hwnd: *mut c_void, min: u32, max: u32) -> i32;
+        fn TranslateMessage(msg: *const Msg) -> i32;
+        fn DispatchMessageW(msg: *const Msg) -> isize;
+        fn RegisterSuspendResumeNotification(recipient: *mut c_void, flags: u32) -> *mut c_void;
+    }
+
+    #[link(name = "wtsapi32")]
+    extern "system" {
+        fn WTSRegisterSessionNotification(hwnd: *mut c_void, flags: u32) -> i32;
+    }
+
+    extern "system" fn wnd_proc(
+        hwnd: *mut c_void,
+        msg: u32,
+        wparam: usize,
+        lparam: isize,
+    ) -> isize {
+        let notify = match msg {
+            WM_POWERBROADCAST => {
+                wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND
+            }
+            WM_WTSSESSION_CHANGE => matches!(
+                wparam,
+                WTS_SESSION_LOGON | WTS_SESSION_LOGOFF | WTS_SESSION_LOCK | WTS_SESSION_UNLOCK
+            ),
+            _ => false,
+        };
+        if notify {
+            notify_pin_lock();
+        }
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+    }
+
+    let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+    let hwnd = CreateWindowExW(
+        0,
+        class.as_ptr(),
+        std::ptr::null(),
+        0,
+        0,
+        0,
+        0,
+        0,
+        HWND_MESSAGE,
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+    );
+    if hwnd.is_null() {
+        log::warn!("no se pudo crear la ventana para los avisos de Windows");
+        return;
+    }
+    if WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION) == 0 {
+        log::warn!("no se pudo registrar la notificacion de sesion de Windows");
+    }
+    RegisterSuspendResumeNotification(hwnd, DEVICE_NOTIFY_WINDOW_HANDLE);
+    let mut msg: Msg = std::mem::zeroed();
+    while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+}
+
+fn notify_pin_lock() {
+    #[cfg(feature = "flutter")]
+    {
+        use std::collections::HashMap;
+        let data = HashMap::from([("name", "callback_device_resumed".to_owned())]);
+        crate::flutter::push_global_event(
+            crate::flutter::APP_TYPE_MAIN,
+            serde_json::ser::to_string(&data).unwrap_or_default(),
+        );
+    }
 }
 
 /// Acceso directo en el escritorio que abre la conexion RDP del equipo.
