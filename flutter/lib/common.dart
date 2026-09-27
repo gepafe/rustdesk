@@ -1694,7 +1694,7 @@ void applyCustomClientDefaults({bool force = false}) {
   setLocal(kOptionAllowAutoRecordOutgoing, 'N');
   setMain(kOptionAllowAutoRecordIncoming, 'N');
   setMain(kOptionDisableUdp, 'N');
-  setMain(kOptionAllowRemoteConfigModification, 'N');
+  setMain(kOptionAllowRemoteConfigModification, 'Y');
   setMain(kOptionEnableLanDiscovery, 'N');
   setMain(kOptionDirectxCapture, 'Y');
   setMain(kOptionEnableHwcodec, 'Y');
