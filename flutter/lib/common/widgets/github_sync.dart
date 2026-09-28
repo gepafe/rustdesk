@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +11,7 @@ import 'package:http/io_client.dart';
 
 import '../../common.dart';
 import '../../models/platform_model.dart';
+import 'pin_lock.dart';
 
 const kGhSyncName = 'gh-sync-name';
 const kGhSyncAuto = 'gh-sync-auto';
@@ -35,6 +38,103 @@ void ghSyncSaveName(String name, {bool? auto}) {
 
 String ghHash(String data) => sha256.convert(utf8.encode(data)).toString();
 
+// --------------------------- cifrado con el PIN ---------------------------
+
+const int _kSyncIterations = 20000;
+
+Uint8List _syncKey(List<int> pin, List<int> salt) {
+  final out = <int>[];
+  final hmac = Hmac(sha256, pin);
+  var block = 1;
+  while (out.length < 64) {
+    final idx = [
+      (block >> 24) & 0xff,
+      (block >> 16) & 0xff,
+      (block >> 8) & 0xff,
+      block & 0xff,
+    ];
+    var u = hmac.convert([...salt, ...idx]).bytes;
+    final acc = List<int>.from(u);
+    for (var i = 1; i < _kSyncIterations; i++) {
+      u = hmac.convert(u).bytes;
+      for (var j = 0; j < acc.length; j++) {
+        acc[j] ^= u[j];
+      }
+    }
+    out.addAll(acc);
+    block++;
+  }
+  return Uint8List.fromList(out.sublist(0, 64));
+}
+
+Uint8List _syncStream(List<int> key, List<int> nonce, List<int> data) {
+  final hmac = Hmac(sha256, key);
+  final ks = <int>[];
+  var counter = 0;
+  while (ks.length < data.length) {
+    ks.addAll(hmac.convert([
+      ...nonce,
+      (counter >> 24) & 0xff,
+      (counter >> 16) & 0xff,
+      (counter >> 8) & 0xff,
+      counter & 0xff,
+    ]).bytes);
+    counter++;
+  }
+  final out = Uint8List(data.length);
+  for (var i = 0; i < data.length; i++) {
+    out[i] = data[i] ^ ks[i];
+  }
+  return out;
+}
+
+bool _syncSame(List<int> a, List<int> b) {
+  if (a.length != b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) {
+    d |= a[i] ^ b[i];
+  }
+  return d == 0;
+}
+
+/// Cifra con el PIN. Formato: 'ENC1:' + base64(salt16 || nonce16 || ct || tag32).
+String ghEncryptData(String plain, String pin) {
+  final rnd = Random.secure();
+  final salt = List<int>.generate(16, (_) => rnd.nextInt(256));
+  final nonce = List<int>.generate(16, (_) => rnd.nextInt(256));
+  final key = _syncKey(utf8.encode(pin), salt);
+  final ct = _syncStream(key.sublist(0, 32), nonce, utf8.encode(plain));
+  final tag = Hmac(sha256, key.sublist(32, 64))
+      .convert([...nonce, ...ct])
+      .bytes
+      .sublist(0, 32);
+  return 'ENC1:${base64Encode([...salt, ...nonce, ...ct, ...tag])}';
+}
+
+/// Descifra (formato ENC1:) o devuelve el texto tal cual si es JSON viejo sin
+/// cifrar. Devuelve null si no se puede abrir (PIN distinto).
+String? ghDecryptData(String data, String pin) {
+  final t = data.trim();
+  if (!t.startsWith('ENC1:')) return t;
+  try {
+    final raw = base64Decode(t.substring(5));
+    if (raw.length < 64) return null;
+    final salt = raw.sublist(0, 16);
+    final nonce = raw.sublist(16, 32);
+    final tag = raw.sublist(raw.length - 32);
+    final ct = raw.sublist(32, raw.length - 32);
+    final key = _syncKey(utf8.encode(pin), salt);
+    final expect = Hmac(sha256, key.sublist(32, 64))
+        .convert([...nonce, ...ct])
+        .bytes
+        .sublist(0, 32);
+    if (!_syncSame(tag, expect)) return null;
+    return utf8.decode(_syncStream(key.sublist(0, 32), nonce, ct));
+  } catch (_) {
+    return null;
+  }
+}
+
 // --------------------------- API de GitHub ---------------------------
 
 bool _ghInsecure = false;
@@ -51,30 +151,40 @@ Uri _ghUri() =>
 
 Future<http.Response> _ghRequest(String method, Uri uri,
     Map<String, String> headers, {String? body}) async {
+  // Sin tiempo limite una llamada colgada frena el temporizador de sync.
+  const t = Duration(seconds: 15);
   Future<http.Response> attempt() async {
     if (_ghInsecure) {
       final client = IOClient(
           HttpClient()..badCertificateCallback = (cert, host, port) => true);
       try {
         return method == 'GET'
-            ? await client.get(uri, headers: headers)
-            : await client.put(uri, headers: headers, body: body);
+            ? await client.get(uri, headers: headers).timeout(t)
+            : await client.put(uri, headers: headers, body: body).timeout(t);
       } finally {
         client.close();
       }
     }
     return method == 'GET'
-        ? await http.get(uri, headers: headers)
-        : await http.put(uri, headers: headers, body: body);
+        ? await http.get(uri, headers: headers).timeout(t)
+        : await http.put(uri, headers: headers, body: body).timeout(t);
   }
 
   try {
     return await attempt();
   } on HandshakeException {
+    // El modo sin verificacion vale SOLO para este intento (antivirus/proxy
+    // mediante); el proximo intento vuelve a validar el certificado.
     _ghInsecure = true;
-    showToast(
-        'No se pudo verificar el certificado HTTPS (antivirus o proxy). Se conecta igual.');
-    return await attempt();
+    try {
+      showToast(
+          'No se pudo verificar el certificado HTTPS (antivirus o proxy). Se conecta igual esta vez.');
+      return await attempt();
+    } finally {
+      _ghInsecure = false;
+    }
+  } on TimeoutException {
+    throw Exception('GitHub no responde (sin internet?)');
   }
 }
 
@@ -93,19 +203,26 @@ Future<Map<String, dynamic>> _ghDownload() async {
 }
 
 Future<void> _ghUpload(String content) async {
-  String? sha;
-  final cur = await _ghDownload();
-  if (cur['exists'] == true) {
-    sha = cur['sha'] as String?;
-  }
-  final body = jsonEncode({
-    'message': 'RustDesk sync ${DateTime.now().toIso8601String()}',
-    'content': base64Encode(utf8.encode(content)),
-    if (sha != null) 'sha': sha,
-  });
-  final resp = await _ghRequest('PUT', _ghUri(), _ghHeaders(), body: body);
-  if (resp.statusCode != 200 && resp.statusCode != 201) {
-    throw Exception('GitHub ${resp.statusCode}');
+  // Si otra PC subio en el medio, el sha queda viejo y GitHub devuelve 422:
+  // se reintenta una vez con el sha fresco en vez de perder el cambio.
+  for (var i = 0; i < 2; i++) {
+    String? sha;
+    final cur = await _ghDownload();
+    if (cur['exists'] == true) {
+      sha = cur['sha'] as String?;
+    }
+    final body = jsonEncode({
+      'message': 'RustDesk sync ${DateTime.now().toIso8601String()}',
+      'content': base64Encode(utf8.encode(content)),
+      if (sha != null) 'sha': sha,
+    });
+    final resp = await _ghRequest('PUT', _ghUri(), _ghHeaders(), body: body);
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      return;
+    }
+    if (resp.statusCode != 422 || i == 1) {
+      throw Exception('GitHub ${resp.statusCode}');
+    }
   }
 }
 
@@ -158,10 +275,30 @@ int ghPeersCount(String json) {
 
 // --------------------------- Vincular / Desvincular ---------------------------
 
+/// PIN para cifrar/descifrar la copia: el de memoria, o se pide con dialogo
+/// si hay contexto. Sin PIN configurado devuelve '' (sin cifrar). Devuelve
+/// null si hace falta el PIN pero no se pudo obtener (modo automatico sin
+/// desbloquear): en ese caso no se sube nada para no degradar a texto plano.
+Future<String?> _syncPin(BuildContext? ctx) async {
+  if (appLockPinMemory().isNotEmpty) return appLockPinMemory();
+  if (getAppLockPin().isEmpty) return '';
+  if (ctx == null) return null;
+  return await askAppLockPin(ctx) ? appLockPinMemory() : null;
+}
+
+/// Cifra para subir en modo automatico. Devuelve null si hay PIN configurado
+/// pero todavia no se ingreso (no se sube nada para no degradar a texto plano).
+String? _syncEncryptAuto(String plain) {
+  if (appLockPinMemory().isNotEmpty) {
+    return ghEncryptData(plain, appLockPinMemory());
+  }
+  return getAppLockPin().isEmpty ? plain : null;
+}
+
 /// Un solo boton: crea el archivo si no existe y, si existe, baja la copia de
 /// GitHub, la combina con la local, sube el resultado y lo aplica (la app se
-/// reinicia sola para aplicarlo).
-Future<String> ghLink() async {
+/// reinicia sola para aplicarlo). La copia viaja cifrada con el PIN de la app.
+Future<String?> ghLink({BuildContext? ctx}) async {
   if (ghSyncName().isEmpty) {
     return 'Escribí un nombre (ej: GERMAN-RUSTDESK)';
   }
@@ -170,18 +307,29 @@ Future<String> ghLink() async {
     if (local.isEmpty) {
       return 'No se pudo generar la lista local';
     }
+    final pin = await _syncPin(ctx);
+    if (pin == null) {
+      return null;
+    }
     final cur = await _ghDownload();
     if (cur['exists'] != true) {
-      await _ghUpload(local);
+      await _ghUpload(pin.isEmpty ? local : ghEncryptData(local, pin));
       await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(local));
       return 'Lista creada en el repositorio';
     }
     final remote = cur['content'] as String;
-    final merged = remote.trimLeft().startsWith('{') ? ghMerge(local, remote) : local;
+    final rdec = remote.trimLeft().startsWith('ENC1:')
+        ? (pin.isEmpty ? null : ghDecryptData(remote, pin))
+        : remote;
+    if (rdec == null) {
+      return 'La copia de GitHub está cifrada con otro PIN';
+    }
+    final merged =
+        rdec.trimLeft().startsWith('{') ? ghMerge(local, rdec) : local;
     if (merged == null) {
       return 'La copia de GitHub no se pudo leer';
     }
-    await _ghUpload(merged);
+    await _ghUpload(pin.isEmpty ? merged : ghEncryptData(merged, pin));
     await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(merged));
     if (ghHash(merged) == ghHash(local)) {
       return 'Ya estaba todo: sin cambios';
@@ -206,6 +354,7 @@ void ghUnlink() {
 Timer? _ghTimer;
 String? _ghLastSeen;
 int _ghQuiet = 0;
+bool _ghBusy = false;
 
 void startGitHubSync() {
   if (_ghTimer != null) {
@@ -213,6 +362,66 @@ void startGitHubSync() {
   }
   _ghTimer = Timer.periodic(const Duration(seconds: 20), (_) => _ghTick());
   _ghCheckRemoteOnStart();
+  _presenceTimer ??=
+      Timer.periodic(const Duration(seconds: 60), (_) => fetchPresence());
+  fetchPresence();
+}
+
+// --------------------------- presencia ---------------------------
+// Cada PC publica sola su estado en presencia.json (cero config: usa el
+// repositorio y token embebidos). La fila de cada equipo muestra quien
+// esta trabajando sin conectarse. Entradas de mas de 5 minutos se ignoran.
+
+const _kPresenceFile = 'presencia.json';
+const _kPresenceStaleSecs = 300;
+
+final Map<String, ({int ts, List<String> sessions})> presenceCache = {};
+final ValueNotifier<int> presenceVersion = ValueNotifier(0);
+Timer? _presenceTimer;
+
+String _cleanSessionName(String raw) {
+  var s = raw.replaceAll(RegExp(r'\s*\(.*\)\s*$'), '');
+  final i = s.indexOf(':');
+  if (i >= 0) {
+    s = s.substring(i + 1);
+  }
+  return s.trim();
+}
+
+Future<void> fetchPresence() async {
+  try {
+    final uri = Uri.parse(
+        'https://api.github.com/repos/${ghSyncRepo()}/contents/$_kPresenceFile');
+    final resp = await _ghRequest('GET', uri, _ghHeaders());
+    if (resp.statusCode != 200) {
+      return;
+    }
+    final j = jsonDecode(resp.body) as Map<String, dynamic>;
+    final raw = base64Decode(
+        (j['content'] as String).replaceAll(RegExp(r'\s'), ''));
+    final map = jsonDecode(utf8.decode(raw)) as Map<String, dynamic>;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    presenceCache.clear();
+    map.forEach((id, v) {
+      if (v is Map) {
+        final ts = (v['ts'] as num?)?.toInt() ?? 0;
+        if (ts > 0 && now - ts <= _kPresenceStaleSecs) {
+          final names = <String>[];
+          final s = v['sessions'];
+          if (s is List) {
+            for (final e in s) {
+              final c = _cleanSessionName(e.toString());
+              if (c.isNotEmpty) {
+                names.add(c);
+              }
+            }
+          }
+          presenceCache[id.toString()] = (ts: ts, sessions: names);
+        }
+      }
+    });
+    presenceVersion.value++;
+  } catch (_) {}
 }
 
 /// Sube la union de la lista local y la de GitHub (sin reiniciar la app).
@@ -220,6 +429,12 @@ Future<void> _ghTick() async {
   if (!ghSyncAuto() || !ghSyncConfigured()) {
     return;
   }
+  // Sin esta guardia, si un tick tarda mas de 20 s (sin internet) los ticks se
+  // solapan y se acumulan llamadas colgadas.
+  if (_ghBusy) {
+    return;
+  }
+  _ghBusy = true;
   try {
     final local = await bind.mainExportConfigBackup();
     if (local.isEmpty) {
@@ -237,25 +452,46 @@ Future<void> _ghTick() async {
     _ghQuiet = 0;
     final cur = await _ghDownload();
     if (cur['exists'] != true) {
-      await _ghUpload(local);
+      final up = _syncEncryptAuto(local);
+      if (up == null) {
+        return;
+      }
+      await _ghUpload(up);
       await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(local));
       showToast('Lista subida a GitHub');
       return;
     }
     final remote = cur['content'] as String;
-    final merged = remote.trimLeft().startsWith('{') ? ghMerge(local, remote) : local;
+    final rdec = remote.trimLeft().startsWith('ENC1:')
+        ? (appLockPinMemory().isNotEmpty
+            ? ghDecryptData(remote, appLockPinMemory())
+            : null)
+        : remote;
+    if (rdec == null) {
+      return;
+    }
+    final merged =
+        rdec.trimLeft().startsWith('{') ? ghMerge(local, rdec) : local;
     if (merged == null) {
       return;
     }
-    if (ghHash(merged) != ghHash(remote)) {
-      await _ghUpload(merged);
+    if (ghHash(merged) != ghHash(rdec)) {
+      final up = _syncEncryptAuto(merged);
+      if (up == null) {
+        return;
+      }
+      await _ghUpload(up);
     }
     await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(merged));
     if (ghPeersCount(merged) > ghPeersCount(local)) {
       final msg = await ghLink();
-      showToast(msg);
+      if (msg != null) {
+        showToast(msg);
+      }
     }
-  } catch (_) {}
+  } catch (_) {} finally {
+    _ghBusy = false;
+  }
 }
 
 Future<void> _ghCheckRemoteOnStart() async {
@@ -268,17 +504,24 @@ Future<void> _ghCheckRemoteOnStart() async {
       return;
     }
     final remote = cur['content'] as String;
-    if (!remote.trimLeft().startsWith('{')) {
+    final rdec = remote.trimLeft().startsWith('ENC1:')
+        ? (appLockPinMemory().isNotEmpty
+            ? ghDecryptData(remote, appLockPinMemory())
+            : null)
+        : remote;
+    if (rdec == null || !rdec.trimLeft().startsWith('{')) {
       return;
     }
     final local = await bind.mainExportConfigBackup();
     if (local.isEmpty) {
       return;
     }
-    final merged = ghMerge(local, remote);
+    final merged = ghMerge(local, rdec);
     if (merged != null && ghHash(merged) != ghHash(local)) {
       final msg = await ghLink();
-      showToast(msg);
+      if (msg != null) {
+        showToast(msg);
+      }
     }
   } catch (_) {}
 }
@@ -313,7 +556,8 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
                 const Text(
                   'El repositorio y el token ya vienen dentro de la app: solo poné tu nombre '
                   '(la lista se guarda como equipos-<nombre>.json). Vincular crea la lista la '
-                  'primera vez y después la combina con la de GitHub.',
+                  'primera vez y después la combina con la de GitHub, cifrada con el PIN de '
+                  'la app (si tenés uno).',
                   style: TextStyle(fontSize: 12),
                 ),
               ],
@@ -329,7 +573,10 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
             onPressed: () async {
               ghSyncSaveName(nameC.text, auto: auto);
               startGitHubSync();
-              showToast(await ghLink());
+              final msg = await ghLink(ctx: ctx);
+              if (msg != null) {
+                showToast(msg);
+              }
             },
             child: const Text('Vincular'),
           ),

@@ -1019,11 +1019,11 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
             title: Text(translate("Security")),
             tiles: [
               SettingsTile(
-                title: Text(translate("Lock app with PIN")),
+                title: Text(translate("Bloquear app con PIN")),
                 leading: Icon(Icons.lock_outline),
                 value: getAppLockPin().isEmpty ? null : const Text('••••'),
                 onPressed: (context) =>
-                    changeAppLockPinDialog(getAppLockPin(), () {
+                    changeAppLockPinDialog('', () {
                   setState(() {});
                 }),
               ),

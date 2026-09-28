@@ -2443,10 +2443,7 @@ void showWindowsSessionsDialog(
     SessionID sessionId,
     String peerId,
     String sessions,
-    {bool privateUser = false}) {
-  // Cliente personalizado: mientras esta abierta la lista de sesiones no se
-  // manda mouse ni teclado al equipo remoto (evita clicks antes de elegir).
-  gFFI.ffiModel.inputBlocked = true;
+    {bool privateUser = false, VoidCallback? onSessionChosen}) {
   List<dynamic> sessionsList = [];
   try {
     sessionsList = json.decode(sessions);
@@ -2466,7 +2463,7 @@ void showWindowsSessionsDialog(
   }
 
   void sendSelected() {
-    gFFI.ffiModel.inputBlocked = false;
+    onSessionChosen?.call();
     bind.sessionSendSelectedSessionId(
         sessionId: sessionId, sid: selectedUserValue);
   }

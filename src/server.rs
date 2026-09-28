@@ -641,6 +641,9 @@ pub async fn start_server(is_server: bool, no_server: bool) {
         base::platform::windows::start_cpu_performance_monitor();
     });
 
+    #[cfg(feature = "flutter")]
+    crate::presence::spawn_presence_publisher();
+
     if is_server {
         crate::common::set_server_running(true);
         std::thread::spawn(move || {

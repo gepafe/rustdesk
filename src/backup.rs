@@ -51,8 +51,25 @@ fn do_export() -> ResultType<String> {
     collect_files(&dir, &dir, &mut entries);
     let mut files = serde_json::Map::new();
     let mut mtimes = serde_json::Map::new();
+    // La API de GitHub rechaza archivos de ~1 MB: solo viaja lo necesario
+    // (carpeta peers/ y .toml chicos del nivel superior) con tope total.
+    let mut total: usize = 0;
     for (name, path) in entries {
+        let keep = name.starts_with("peers/")
+            || (!name.contains('/') && name.ends_with(".toml"));
+        if !keep {
+            continue;
+        }
         let data = fs::read(&path)?;
+        if data.len() > 512 * 1024 {
+            log::warn!("backup skips big file {name} ({} bytes)", data.len());
+            continue;
+        }
+        if total + data.len() > 800 * 1024 {
+            log::warn!("backup too large, truncating at {name}");
+            break;
+        }
+        total += data.len();
         let modified = fs::metadata(&path)
             .and_then(|m| m.modified())
             .ok()

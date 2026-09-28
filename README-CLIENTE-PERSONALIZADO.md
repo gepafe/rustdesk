@@ -1,125 +1,95 @@
-# Cliente RustDesk Personalizado - Ventana CM Oculta
+# Cliente personalizado (fork gepafe/rustdesk)
 
-Cliente personalizado de RustDesk para Windows que oculta la **ventana de Gestión
-de Conexiones (CM)** por defecto y **desactiva las actualizaciones automáticas**,
-manteniendo el nombre y el logo originales de RustDesk.
+Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
+`flutter/lib` y `src/`; `libs/hbb_common` es submódulo oficial y NO se toca.
 
-## ¿Qué hace este cliente?
+## Personalizaciones
 
-En las versiones recientes de RustDesk (1.2.3+) la opción "Ocultar ventana de
-gestión de conexiones" se eliminó de la interfaz. Este cliente la restaura y la
-**fuerza activada por defecto** de forma que la ventana CM no aparece en el equipo
-remoto durante una sesión de soporte.
+- **Ventana CM no se abre sola**: al llegar una conexión no aparece la ventana
+  principal (`flutter/lib/models/server_model.dart`, `addConnection`/`_addTab`).
+- **Sin icono de bandeja en Windows**: no hay botón derecho → "Detener servicio"
+  (`src/tray.rs`, `start_tray` retorna en Windows).
+- **PIN de app unificado** (`flutter/lib/common/widgets/pin_lock.dart`): bloquea
+  la UI al abrir, al desbloquear Windows, al iniciar/cerrar sesión y al volver
+  de suspensión (eventos de Windows, sin polling: `src/platform/windows.rs`,
+  `spawn_resume_watcher`). Guardado como hash `v1:salt:sha256` en la opción
+  local `app-lock-pin`; el PIN queda en memoria para cifrar la sync. Las
+  pestañas Seguridad/Red de Ajustes piden ese mismo PIN.
+- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad
+  (opción del servicio `private-user`); viaja en el evento
+  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo
+  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene
+  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`.
+- **Modo vista por acción**: doble clic/clic siempre controla (limpia
+  `view_only`); `VER SOLAMENTE` siempre abre en vista; el botón de la barra de
+  sesión no se guarda (`peer_card.dart` `_connectControl`, `model.dart`
+  `setViewOnly(peerId, false)`).
+- **Sin clics fantasma**: mientras se elige sesión de Windows, el input se
+  bloquea en el FFI de la sesión (`inputBlocked`; gates en
+  `flutter/lib/models/input_model.dart`: `inputKey`, `scroll`, `sendMouse`,
+  `handleMouse`).
+- **Cursor remoto visible por defecto** (user-default `show_remote_cursor=Y`
+  en `applyCustomClientDefaults`, `flutter/lib/common.dart`).
+- **Sin WebRTC por defecto** (`enable-webrtc=N` local; casilla en
+  Ajustes → Red para redes raras).
+- **RDP**: botón `RDP` en la fila si hay usuario/contraseña guardados; item RDP
+  solo en Windows; ventana del túnel ("Escuchando") arranca y se mantiene
+  minimizada; la pestaña se cierra sola al cerrar mstsc (watchdog de PID);
+  atajo `.lnk` normal y `.lnk` RDP con el nombre del equipo; tilde de recordar
+  credenciales re-habilitado.
+- **Diseño compacto**: columna izquierda 250px, iconos al fondo de esa columna,
+  sin barra "Listo", sin barra de pestaña única, sin subtítulos "Sesiones".
+- **Copia de seguridad** (Ajustes → About / final de Ajustes en móvil):
+  exporta/importa todo el config dir como texto (incluye `peers/`).
+- **Sync con GitHub** (Ajustes → Sincronizar con GitHub): repo fijo
+  `vitalfix/rustdesk-listas` + token embebido; un campo Nombre
+  (`equipos-<nombre>.json`), botón Vincular (crea o combina por fecha y
+  aplica), Desvincular, auto-sync cada 20 s en ambas direcciones. El archivo
+  se **cifra con el PIN de la app** (sin PIN configurado va en claro).
+- **Presencia**: cada PC publica cada 2 min sus sesiones en `presencia.json`
+  del mismo repo (servicio, `src/presence.rs`); la lista muestra por fila
+  "N trabajando: nombres" o "libre".
+- **Monitoreo Telegram** por equipo + chequeo cada 10 s.
+- **Android**: APK firmado con clave fija (actualiza encima); `hasFragileUserData`
+  para conservar datos al desinstalar.
+- **macOS**: dmg con firma ad-hoc (sin cuenta Apple Developer: abrir con
+  clic derecho → Abrir la primera vez).
 
-Modificaciones aplicadas sobre el código fuente:
+## Compilar y bajar
 
-1. **`flutter/lib/models/server_model.dart`** - el valor por defecto de `hideCm`
-   pasa a `true` y se notifica a la UI cuando cambia.
-2. **`flutter/lib/main.dart`** - al iniciar la sesión de conexión se fuerza siempre
-   `hideCm = true` y se oculta la ventana CM.
-3. **`flutter/lib/desktop/pages/desktop_setting_page.dart`** - se descomenta el
-   checkbox "Ocultar ventana de gestión de conexiones" y se bloquea con
-   `IgnorePointer` para que no pueda desactivarse desde la interfaz.
-4. **`src/updater.rs`** - las actualizaciones automáticas quedan deshabilitadas de
-   fábrica, para que los clientes no pierdan la personalización al actualizarse.
-
-> El cliente mantiene el **nombre y el logo originales de RustDesk** (no se
-> rebautiza a VITALFIX).
-
-## Instalación en los equipos del equipo (20 equipos)
-
-1. Descarga el instalador `.exe` desde el release del fork:
-   - Ve a **Releases** en el repositorio del fork
-     `https://github.com/gepafe/rustdesk/releases`
-   - Descarga el instalador de Windows correspondiente a tu arquitectura
-     (`x86_64` para la mayoría).
-2. Ejecuta el instalador en cada equipo con permisos de administrador.
-3. Al terminar, RustDesk queda instalado con la ventana CM oculta por defecto.
-
-### Desactivar las actualizaciones automáticas
-
-Es crítico que los clientes **no se actualicen solos**, porque una actualización
-eliminaría la personalización. Para desactivarlas:
-
-1. Abre RustDesk en el equipo.
-2. Ve a **Configuración (⚙)**.
-3. En la pestaña **General**, desmarca la opción
-   **"Actualizaciones automáticas"** (o "Automatically check update on start").
-4. Confirma el cambio.
-
-Otra alternativa es bloquear el dominio de actualización en el firewall/DNS del
-equipo (puede ser necesario si los usuarios no tienen acceso a la configuración).
-
-## Regenerar el cliente cuando salga una nueva versión de RustDesk
-
-### Método automático (UN SOLO PASO) — recomendado
-
-Cuando el repositorio oficial publique una nueva versión, ejecuta en tu PC:
-
-```bash
-./actualizar.sh
+```sh
+git tag v1.4.0-XX && git push <url-con-token> master v1.4.0-XX
+gh workflow run flutter-tag.yml --repo gepafe/rustdesk --ref v1.4.0-XX \
+  -f platforms=windows,android,macos
+gh release download v1.4.0-XX --repo gepafe/rustdesk \
+  --dir C:/PROYECTOS/RUSTDESK/distribucion --clobber \
+  --pattern rustdesk-1.5.0-x86_64.exe \
+  --pattern "rustdesk-1.5.0-universal-signed.apk" \
+  --pattern rustdesk-1.5.0-aarch64-aarch64.dmg
 ```
 
-El script hace **todo automáticamente**:
-1. Descarga la última versión del repositorio oficial (upstream).
-2. Aplica las personalizaciones (CM oculta y sin actualizaciones automáticas).
-   Se mantiene el nombre y el logo originales de RustDesk.
-3. Sube los cambios y lanza la compilación en GitHub Actions.
-4. Espera a que termine (40-90 min).
-5. Descarga el `.exe` de Windows x64 a tu PC.
+Verificar tamaños locales contra `gh release view v1.4.0-XX --json assets`.
 
-Solo requiere que `gh` esté autenticado (`gh auth login --web --scopes "repo, workflow"`).
+## Secretos y archivos sensibles (NO van al repo)
 
-Variables opcionales:
-- `DEST=/ruta` — carpeta donde dejar el .exe (por defecto: la actual).
-- `WORKDIR=otra_carpeta` — dónde está/crea el clone.
+- Keystore Android: `C:\PROYECTOS\RUSTDESK\distribucion\firma-android\key.p12`
+  (alias `rustdesk`); sus 4 valores están como secrets del repo
+  (`ANDROID_SIGNING_KEY`, `ANDROID_ALIAS`, `ANDROID_KEY_STORE_PASSWORD`,
+  `ANDROID_KEY_PASSWORD`). **Si se pierde, los APK dejan de actualizar encima.**
+- Token de GitHub embebido (repo privado + `presence.rs`): con permiso de
+  escritura. **Si alguien se va en malos términos: revocar el token, poner uno
+  nuevo y sacar versión nueva.** No commitear nunca un token en claro (GitHub
+  bloquea el push por secret scanning).
+- `flutter/pubspec.lock` lo reescribe el SDK local: revertirlo siempre antes
+  de commitear (`git checkout -- flutter/pubspec.lock`).
 
-### Método semiautomático (script rebuild.sh)
+## Notas operativas
 
-Alternativa paso a paso:
-
-1. Clona tu fork (o usa el existente).
-2. Ejecuta el script de reconstrucción:
-
-   ```bash
-   ./rebuild.sh
-   ```
-
-3. El script:
-   - Sincroniza el fork con `upstream` (el repo oficial).
-   - Re-aplica los parches (las modificaciones al código).
-   - Confirma los cambios y los sube.
-   - Crea un tag con marca de tiempo (`vX.Y.Z-custom-<fecha>`).
-   - Dispara la compilación automática en GitHub Actions.
-4. Cuando termine, descarga el nuevo `.exe` desde el release y distribúyelo.
-
-> Nota: si la estructura del código cambió en una versión nueva de RustDesk, el
-> script puede no aplicar los parches de forma limpia. En ese caso revisa los
-> archivos modificados y adapta los cambios manualmente según las secciones de
-> arriba.
-
-## Proceso manual (referencia)
-
-Para regenerar a mano sin el script:
-
-```bash
-gh repo fork rustdesk/rustdesk --clone=false --remote=false
-git clone https://github.com/gepafe/rustdesk.git
-cd rustdesk
-git remote add upstream https://github.com/rustdesk/rustdesk.git
-git fetch upstream
-git checkout master
-git merge upstream/master
-# aplicar las 3 modificaciones al código (ver sección "¿Qué hace este cliente?")
-git add -A
-git commit -m "feat: forzar ocultar ventana CM por defecto en cliente personalizado"
-git push origin master
-git tag -a v1.4.0-custom-$(date +%Y%m%d%H%M) -m "Cliente personalizado con ventana CM oculta"
-git push origin v1.4.0-custom-$(date +%Y%m%d%H%M)
-# monitorear con: gh run list --repo gepafe/rustdesk
-```
-
-## Repositorio del fork
-
-- **URL del fork:** https://github.com/gepafe/rustdesk
-- **Repositorio oficial (upstream):** https://github.com/rustdesk/rustdesk
+- Sin PIN de app, la sync sube en claro; con PIN, cifrada con ese PIN.
+- El PIN (aunque sea hash) no protege un disco robado sin cifrar: usar
+  BitLocker en las PCs.
+- Servidor/relay: se usa la red pública de RustDesk (sin `custom-server`).
+  Proyecto pendiente si se quiere independizar: relay propio.
+- `flutter analyze` local usa un SDK más nuevo que el CI: ignorar los issues
+  preexistentes (DialogTheme/TabBarTheme, `dialog.dart:1448`,
+  `generated_bridge` en `model.dart`); el Rust solo lo valida el CI.

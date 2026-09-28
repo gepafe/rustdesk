@@ -2,6 +2,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
+import 'package:flutter_hbb/common/widgets/github_sync.dart';
 import 'package:flutter_hbb/common/widgets/telegram_monitor.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
@@ -190,10 +191,36 @@ class _PeerCardState extends State<_PeerCard>
               ],
             ),
           ),
+          if (presenceCache.containsKey(peer.id)) _presenceBadge(peer.id),
           if (hasRdpSaved(peer.id)) _rdpRowButton(peer),
           checkBoxOrActionMoreLandscape(peer, isTile: true),
         ],
       ),
+    );
+  }
+
+  Widget _presenceBadge(String id) {
+    return ValueListenableBuilder<int>(
+      valueListenable: presenceVersion,
+      builder: (_, __, ___) {
+        final p = presenceCache[id];
+        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        if (p == null || now - p.ts > 300) {
+          return const SizedBox.shrink();
+        }
+        final n = p.sessions.length;
+        final color = n == 0 ? Colors.grey : Colors.green;
+        final txt =
+            n == 0 ? 'libre' : '$n trabajando: ${p.sessions.join(';')}';
+        return Flexible(
+          child: Text(
+            '• $txt',
+            style: TextStyle(fontSize: 10, color: color),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ).marginOnly(left: 8),
+        );
+      },
     );
   }
 
@@ -835,7 +862,7 @@ abstract class BasePeerCard extends StatelessWidget {
   MenuEntryBase<String> _createShortCutAction(String id) {
     return MenuEntryButton<String>(
       childBuilder: (TextStyle? style) => Text(
-        translate('Create desktop shortcut'),
+        translate('Crear acceso en el escritorio'),
         style: style,
       ),
       proc: () {
@@ -1082,7 +1109,6 @@ class RecentPeerCard extends BasePeerCard {
       BuildContext context) async {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
-      _transferFileAction(context),
       _terminalAction(context),
     ];
 
@@ -1193,7 +1219,6 @@ class FavoritePeerCard extends BasePeerCard {
       BuildContext context) async {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
-      _transferFileAction(context),
       _terminalAction(context),
     ];
 
@@ -1242,7 +1267,6 @@ class DiscoveredPeerCard extends BasePeerCard {
       BuildContext context) async {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
-      _transferFileAction(context),
       _terminalAction(context),
     ];
 
@@ -1292,7 +1316,6 @@ class AddressBookPeerCard extends BasePeerCard {
       BuildContext context) async {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
-      _transferFileAction(context),
       _terminalAction(context),
     ];
 
@@ -1442,7 +1465,6 @@ class MyGroupPeerCard extends BasePeerCard {
       BuildContext context) async {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
-      _transferFileAction(context),
       _terminalAction(context),
     ];
 

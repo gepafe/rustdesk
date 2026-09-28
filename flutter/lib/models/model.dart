@@ -899,9 +899,16 @@ class FfiModel with ChangeNotifier {
     final text = translate('Please select the session you want to connect to');
     final type = "";
 
+    // Cliente personalizado: mientras esta abierta la lista de sesiones no se
+    // manda mouse ni teclado al equipo remoto (evita clicks antes de elegir).
+    parent.target!.ffiModel.inputBlocked = true;
     showWindowsSessionsDialog(
         type, title, text, dialogManager, sessionId, peerId, sessions,
-        privateUser: evt['private_user'] == 'Y');
+        privateUser: evt['private_user'] == 'Y',
+        onSessionChosen: () {
+          // La sesion queda sin input hasta elegirla; recien ahi se habilita.
+          parent.target?.ffiModel.inputBlocked = false;
+        });
   }
 
   /// Handle the message box event based on [evt] and [id].

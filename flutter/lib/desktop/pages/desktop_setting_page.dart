@@ -1001,7 +1001,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
         controller: scrollController,
         child: Column(
           children: [
-            _lock(locked, 'Unlock Security Settings', () {
+            _lock(context, locked, 'Unlock Security Settings', () {
               locked = false;
               setState(() => {});
             }),
@@ -1444,7 +1444,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                       onChanged: enabled ? (_) => onChanged(!value) : null)
                   .marginOnly(right: 5),
               Expanded(
-                child: Text(translate('Enable RDP session sharing'),
+                child: Text(translate('Compartir sesiones RDP'),
                     style:
                         TextStyle(color: disabledTextColor(context, enabled))),
               )
@@ -1726,7 +1726,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
     }
 
     onChanged(bool? checked) async {
-      changeAppLockPinDialog(getAppLockPin(), update);
+      changeAppLockPinDialog('', update);
     }
 
     return GestureDetector(
@@ -1738,7 +1738,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                   .marginOnly(right: 5),
               Expanded(
                   child: Text(
-                translate('Lock app with PIN'),
+                translate('Bloquear app con PIN'),
                 style: TextStyle(color: disabledTextColor(context, enabled)),
               ))
             ],
@@ -1770,7 +1770,7 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
   Widget build(BuildContext context) {
     super.build(context);
     return ListView(controller: scrollController, children: [
-      _lock(locked, 'Unlock Network Settings', () {
+      _lock(context, locked, 'Unlock Network Settings', () {
         locked = false;
         setState(() => {});
       }),
@@ -2992,6 +2992,7 @@ Widget _SubLabeledWidget(BuildContext context, String label, Widget child,
 }
 
 Widget _lock(
+  BuildContext context,
   bool locked,
   String label,
   Function() onUnlock,
@@ -3017,14 +3018,13 @@ Widget _lock(
                             Text(translate(label)).marginOnly(left: 5),
                           ]).marginSymmetric(vertical: 2)),
                   onPressed: () async {
-                    final unlockPin = getAppLockPin();
-                    if (unlockPin.isEmpty) {
+                    if (getAppLockPin().isEmpty) {
                       bool checked = await callMainCheckSuperUserPermission();
                       if (checked) {
                         onUnlock();
                       }
-                    } else {
-                      checkUnlockPinDialog(unlockPin, onUnlock);
+                    } else if (await askAppLockPin(context)) {
+                      onUnlock();
                     }
                   },
                 ).marginSymmetric(horizontal: 2, vertical: 4),

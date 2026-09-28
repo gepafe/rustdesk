@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
@@ -18,22 +20,60 @@ import 'package:window_manager/window_manager.dart';
 /// Evento que manda Rust cuando la maquina vuelve de suspension.
 const String _kResumeEvent = 'callback_device_resumed';
 
-/// Lee el PIN de bloqueo de la app (guardado codificado en una local option).
+/// PIN de la app en memoria (solo vive mientras la app corre): sirve para
+/// cifrar la sincronizacion sin pedirlo a cada rato.
+String _appLockPinMemory = '';
+
+/// PIN en memoria ('' si todavia no se ingreso en esta corrida).
+String appLockPinMemory() => _appLockPinMemory;
+
+bool _isPinHash(String stored) => stored.startsWith('v1:');
+
+String _hashPin(String pin, String salt) =>
+    sha256.convert(utf8.encode('$salt:$pin')).toString();
+
+String _randomHex(int bytes) {
+  final r = Random.secure();
+  final b = List<int>.generate(bytes, (_) => r.nextInt(256));
+  return b.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// Lee el PIN de bloqueo de la app (guardado en una local option).
+/// Devuelve '' si no hay PIN. OJO: si hay PIN devuelve el valor guardado
+/// (hash), no el PIN; para comprobar un PIN usar verifyAppLockPin().
 String getAppLockPin() {
-  final raw = bind.mainGetLocalOption(key: kOptionAppLockPin);
-  if (raw.isEmpty) return '';
-  try {
-    return utf8.decode(base64.decode(raw));
-  } catch (_) {
-    return '';
+  return bind.mainGetLocalOption(key: kOptionAppLockPin);
+}
+
+/// True si el PIN ingresado abre. Acepta el formato nuevo (hash con salt) y
+/// el formato viejo (base64), que se migra solo al verificar.
+bool verifyAppLockPin(String pin) {
+  final stored = bind.mainGetLocalOption(key: kOptionAppLockPin);
+  if (stored.isEmpty) return false;
+  if (_isPinHash(stored)) {
+    final parts = stored.split(':');
+    if (parts.length != 3) return false;
+    return _hashPin(pin, parts[1]) == parts[2];
   }
+  try {
+    if (utf8.decode(base64.decode(stored)) == pin) {
+      setAppLockPin(pin);
+      return true;
+    }
+  } catch (_) {}
+  return false;
 }
 
 /// Guarda (o borra, si se pasa vacío) el PIN de bloqueo de la app.
 Future<void> setAppLockPin(String pin) async {
-  await bind.mainSetLocalOption(
-      key: kOptionAppLockPin,
-      value: pin.isEmpty ? '' : base64Encode(utf8.encode(pin)));
+  if (pin.isEmpty) {
+    await bind.mainSetLocalOption(key: kOptionAppLockPin, value: '');
+  } else {
+    final salt = _randomHex(16);
+    await bind.mainSetLocalOption(
+        key: kOptionAppLockPin, value: 'v1:$salt:${_hashPin(pin, salt)}');
+  }
+  _appLockPinMemory = pin;
   markAppLockAsked();
 }
 
@@ -121,6 +161,46 @@ void changeAppLockPinDialog(String oldPin, Function() callback) {
   });
 }
 
+/// Pide el PIN de la app con un dialogo y lo verifica. Devuelve true si abre
+/// (y lo deja en memoria para la sincronizacion). Si no hay PIN, true.
+Future<bool> askAppLockPin(BuildContext context) async {
+  if (getAppLockPin().isEmpty) return true;
+  final c = TextEditingController();
+  var ok = false;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('PIN de la app'),
+      content: TextField(
+        controller: c,
+        obscureText: true,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'PIN'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (verifyAppLockPin(c.text.trim())) {
+              _appLockPinMemory = c.text.trim();
+              ok = true;
+              Navigator.pop(ctx);
+            } else {
+              showToast('PIN incorrecto');
+            }
+          },
+          child: const Text('Aceptar'),
+        ),
+      ],
+    ),
+  );
+  c.dispose();
+  return ok;
+}
+
 class PinLockGate extends StatefulWidget {
   final Widget child;
 
@@ -193,7 +273,8 @@ class _PinLockGateState extends State<PinLockGate> {
   }
 
   void _submit() {
-    if (_controller.text.trim() == _correctPin) {
+    if (verifyAppLockPin(_controller.text.trim())) {
+      _appLockPinMemory = _controller.text.trim();
       _releaseForeground();
       markAppLockAsked();
       setState(() {

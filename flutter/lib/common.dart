@@ -1711,6 +1711,10 @@ void applyCustomClientDefaults({bool force = false}) {
   // Calidad de imagen optima por defecto en cada conexion.
   bind.mainSetUserDefaultOption(
       key: kOptionImageQuality, value: kRemoteImageQualityBest);
+  // Cursor remoto visible por defecto.
+  if (bind.mainGetUserDefaultOption(key: kOptionShowRemoteCursor).isEmpty) {
+    bind.mainSetUserDefaultOption(key: kOptionShowRemoteCursor, value: 'Y');
+  }
 }
 
 // Don't use `option2bool()` and `bool2option()` to convert the session option.

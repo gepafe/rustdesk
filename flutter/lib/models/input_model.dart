@@ -486,6 +486,7 @@ class InputModel {
   bool get showMyCursor => parent.target!.ffiModel.showMyCursor;
   double get devicePixelRatio => parent.target!.canvasModel.devicePixelRatio;
   bool get isViewCamera => parent.target!.connType == ConnType.viewCamera;
+  bool get isInputBlocked => parent.target!.ffiModel.inputBlocked;
   int get trackpadSpeed => _trackpadSpeed;
   bool get useEdgeScroll =>
       parent.target!.canvasModel.scrollStyle == ScrollStyle.scrolledge;
@@ -1029,6 +1030,7 @@ class InputModel {
   void inputKey(String name, {bool? down, bool? press}) {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
+    if (isInputBlocked) return;
     bind.sessionInputKey(
         sessionId: sessionId,
         name: name,
@@ -1099,6 +1101,7 @@ class InputModel {
   /// Send scroll event with scroll distance [y].
   Future<void> scroll(int y) async {
     if (isViewCamera) return;
+    if (isInputBlocked) return;
     await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json
@@ -1132,6 +1135,7 @@ class InputModel {
   Future<void> sendMouse(String type, MouseButtons button) async {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
+    if (isInputBlocked) return;
     await _sendMouseUnchecked(type, button);
   }
 
@@ -1895,6 +1899,7 @@ class InputModel {
     bool moveCanvas = true,
     bool edgeScroll = false,
   }) {
+    if (isInputBlocked) return null;
     final evtToPeer = processEventToPeer(evt, offset,
         onExit: onExit, moveCanvas: moveCanvas, edgeScroll: edgeScroll);
     if (evtToPeer != null) {

@@ -41,6 +41,8 @@ use common::*;
 mod auth_2fa;
 #[cfg(feature = "flutter")]
 mod backup;
+#[cfg(feature = "flutter")]
+mod presence;
 #[cfg(not(target_os = "ios"))]
 mod clipboard;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
