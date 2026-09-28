@@ -45,6 +45,10 @@ pub(crate) const APP_TYPE_DESKTOP_PORT_FORWARD: &str = "port forward";
 
 pub type FlutterSession = Arc<Session<FlutterHandler>>;
 
+/// Bandera USUARIO PRIVADO de la PC remota (llega en platform_additions del
+/// peer_info; ver ui_session_interface::handle_peer_info).
+pub(crate) static REMOTE_PRIVATE_USER: AtomicBool = AtomicBool::new(false);
+
 lazy_static::lazy_static! {
     pub(crate) static ref CUR_SESSION_ID: RwLock<SessionID> = Default::default(); // For desktop only
     static ref GLOBAL_EVENT_STREAM: RwLock<HashMap<String, StreamSink<String>>> = Default::default(); // rust to dart event channel
@@ -937,7 +941,7 @@ impl InvokeUiSession for FlutterHandler {
             h.insert("name", d.name);
             msg_vec.push(h);
         }
-        let private_user = if crate::ui_interface::get_option("private-user") == "Y" {
+        let private_user = if REMOTE_PRIVATE_USER.load(Ordering::SeqCst) {
             "Y".to_owned()
         } else {
             "".to_owned()

@@ -424,6 +424,15 @@ Future<void> fetchPresence() async {
   } catch (_) {}
 }
 
+/// Sesiones activas que publico la PC (vacio si no hay dato fresco).
+List<String> presenceSessionsOf(String id) {
+  final p = presenceCache[id];
+  if (p == null) return const [];
+  final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  if (now - p.ts > _kPresenceStaleSecs) return const [];
+  return p.sessions;
+}
+
 /// Sube la union de la lista local y la de GitHub (sin reiniciar la app).
 Future<void> _ghTick() async {
   if (!ghSyncAuto() || !ghSyncConfigured()) {

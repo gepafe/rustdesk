@@ -1958,6 +1958,12 @@ impl Connection {
                 "supported_privacy_mode_impl".into(),
                 json!(privacy_mode::get_supported_privacy_mode_impl()),
             );
+            // La PC que recibe la conexión publica su casilla USUARIO PRIVADO
+            // para que el controlador pida la clave 777 al elegir sesión.
+            platform_additions.insert(
+                "private_user".into(),
+                json!(Config::get_option("private-user") == "Y"),
+            );
         }
         #[cfg(target_os = "macos")]
         {

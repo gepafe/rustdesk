@@ -15,11 +15,7 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   `spawn_resume_watcher`). Guardado como hash `v1:salt:sha256` en la opción
   local `app-lock-pin`; el PIN queda en memoria para cifrar la sync. Las
   pestañas Seguridad/Red de Ajustes piden ese mismo PIN.
-- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad
-  (opción del servicio `private-user`); viaja en el evento
-  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo
-  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene
-  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`.
+- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad\n  (opción del servicio `private-user`); viaja en el evento\n  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo\n  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene\n  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`. La bandera\n  la publica la PC REMOTA en `platform_additions` (`src/server/connection.rs`,\n  `on_remote_authorized`), el controlador la guarda en\n  `crate::flutter::REMOTE_PRIVATE_USER` (`src/ui_session_interface.rs`,\n  `handle_peer_info`) y `flutter.rs` la usa al armar el evento (antes leía la\n  opción local del controlador = nunca se pedía 777). Requiere \"Compartir\n  sesiones RDP\" activo en la PC remota.", "oldString": "- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad\n  (opción del servicio `private-user`); viaja en el evento\n  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo\n  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene\n  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`.", "path": "C:\\PROYECTOS\\RUSTDESK\\rustdesk\\README-CLIENTE-PERSONALIZADO.md"
 - **Modo vista por acción**: doble clic/clic siempre controla (limpia
   `view_only`); `VER SOLAMENTE` siempre abre en vista; el botón de la barra de
   sesión no se guarda (`peer_card.dart` `_connectControl`, `model.dart`
@@ -48,7 +44,9 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   se **cifra con el PIN de la app** (sin PIN configurado va en claro).
 - **Presencia**: cada PC publica cada 2 min sus sesiones en `presencia.json`
   del mismo repo (servicio, `src/presence.rs`); la lista muestra por fila
-  "N trabajando: nombres" o "libre".
+  "N trabajando: nombres" o "libre". El subtítulo de cada fila (vista lista y
+  tarjeta) muestra `usuario@host;p1;p2;...` con las sesiones activas de la PC
+  remota (`presenceSessionsOf` en `github_sync.dart`).
 - **Monitoreo Telegram** por equipo + chequeo cada 10 s.
 - **Android**: APK firmado con clave fija (actualiza encima); `hasFragileUserData`
   para conservar datos al desinstalar.

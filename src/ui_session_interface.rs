@@ -1859,6 +1859,16 @@ impl<T: InvokeUiSession> Interface for Session<T> {
                 crate::platform::windows::add_recent_document(&path);
             }
         }
+        // La bandera USUARIO PRIVADO viaja en platform_additions de la PC
+        // remota (flutter.rs la lee al armar el evento de sesiones).
+        crate::flutter::REMOTE_PRIVATE_USER.store(
+            !pi.platform_additions.is_empty()
+                && serde_json::from_str::<serde_json::Value>(&pi.platform_additions)
+                    .ok()
+                    .and_then(|v| v.get("private_user").and_then(|b| b.as_bool()))
+                    .unwrap_or(false),
+            std::sync::atomic::Ordering::SeqCst,
+        );
         if !pi.windows_sessions.sessions.is_empty() {
             let selected = self
                 .lc

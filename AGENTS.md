@@ -164,3 +164,43 @@ Then translate that source into the file's target language (infer the language f
 * New English-text keys use sentence case, not Title Case: `Use ID whitelisting`, **not** `Use ID Whitelisting`. Acronyms (ID, IP, 2FA…) stay uppercase. Legacy Title-Case keys (e.g. `Use IP Whitelisting`) stay as-is — do not rename them.
 * Since the key itself is the English display text, a sentence-case key usually needs **no** `en.rs` entry; add one only when the display text must differ from the key (e.g. `*_tip` keys).
 * Append each new key to `template.rs` (with `""`) and to every `src/lang/*.rs` file (translated, or `""` if unsure; always `""` for `it.rs`), at the end of the list.
+
+## This fork (gepafe/rustdesk) — environment & release gotchas
+
+Work happens on Windows (pwsh) against the `master` branch of the
+`gepafe/rustdesk` fork. `README-CLIENTE-PERSONALIZADO.md` (repo root) is the
+running log of all customizations — update it when adding a feature. UI strings
+and code comments for fork features are written in Spanish.
+
+* **No Rust toolchain locally** (no `cargo`/`rustc`). Rust changes are validated
+  only by CI. Never try `cargo check/build` here.
+* **Local Flutter SDK is NEWER than CI's**, so `flutter analyze` reports
+  pre-existing noise: `DialogTheme`/`TabBarTheme`/`String?` mismatches,
+  `dialog.dart:1448`, and `generated_bridge.dart` missing (which breaks
+  analysis of `models/model.dart`). Only fix issues in lines you touched.
+* **`flutter analyze` does NOT resolve the FRB bridge**, so a wrong FFI name
+  (e.g. `mainSetOptionSync`, which does not exist) passes locally and fails CI.
+  Copy API names from existing usages: `mainSetOption`/`mainGetOptionSync`,
+  `mainSetLocalOption`/`mainGetLocalOption`,
+  `getLocalFlutterOption`/`setLocalFlutterOption`, `mainSetUserDefaultOption`.
+* **Local `flutter pub get`/`analyze` rewrites `flutter/pubspec.lock`** with the
+  newer SDK and breaks CI. Always `git checkout -- flutter/pubspec.lock`
+  before committing.
+* **Never commit secrets.** GitHub push protection rejects the push AND revokes
+  any PAT found in plaintext. Tokens live only in CI secrets or embedded at
+  build time, never in versioned code.
+* Push via token-embedded URL
+  (`https://gepafe:<TOKEN>@github.com/gepafe/rustdesk.git`); never run
+  `gh auth login`. For `gh`, export `GH_TOKEN` (from `git credential fill`).
+* **Tags do not trigger builds.** After pushing a tag, dispatch explicitly:
+  `gh workflow run flutter-tag.yml --repo gepafe/rustdesk --ref <tag> -f platforms=windows,android,macos`.
+  `gh run rerun --failed` often hangs queued — prefer a fresh dispatch.
+* Release asset names: `rustdesk-1.5.0-x86_64.exe`,
+  `rustdesk-1.5.0-universal-signed.apk` (note `-signed`),
+  `rustdesk-1.5.0-aarch64-aarch64.dmg`. After
+  `gh release download --clobber`, verify local sizes against
+  `gh release view <tag> --json assets`. Downloads go to
+  `C:\PROYECTOS\RUSTDESK\distribucion` (outside the repo).
+* `libs/hbb_common` is an official submodule: read-only, never modify.
+* Do not compile, push, tag, or dispatch builds until the user explicitly
+  orders it.

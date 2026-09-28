@@ -171,56 +171,48 @@ class _PeerCardState extends State<_PeerCard>
                   size: 16, color: const Color(0xFF2C88D9))
               : getPlatformImage(peer.platform, size: 16),
           const SizedBox(width: 6),
-          Text(
-            peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
-            style: Theme.of(context).textTheme.titleSmall,
-            maxLines: 1,
-          ),
           Expanded(
-            child: Row(
-              children: [
-                if (name.isNotEmpty)
-                  Flexible(
-                    child: Text(
-                      name,
-                      style: greyStyle,
-                      overflow: TextOverflow.ellipsis,
+            child: ValueListenableBuilder<int>(
+              valueListenable: presenceVersion,
+              builder: (_, __, ___) {
+                // Subtitulo: usuario@equipo y, si la PC publico sus sesiones
+                // activas, la lista de sesiones (ej. P1;P2;P5).
+                final subs = presenceSessionsOf(peer.id).join(';');
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
+                      style: Theme.of(context).textTheme.titleSmall,
                       maxLines: 1,
-                    ).marginOnly(left: 8),
-                  ),
-              ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (name.isNotEmpty || subs.isNotEmpty)
+                      Text.rich(
+                        TextSpan(
+                          text: name,
+                          style: greyStyle,
+                          children: [
+                            if (subs.isNotEmpty)
+                              TextSpan(
+                                text: '${name.isEmpty ? '' : '  '}$subs',
+                                style: greyStyle.copyWith(color: Colors.green),
+                              ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ).marginOnly(top: 1),
+                  ],
+                );
+              },
             ),
           ),
-          if (presenceCache.containsKey(peer.id)) _presenceBadge(peer.id),
           if (hasRdpSaved(peer.id)) _rdpRowButton(peer),
           checkBoxOrActionMoreLandscape(peer, isTile: true),
         ],
       ),
-    );
-  }
-
-  Widget _presenceBadge(String id) {
-    return ValueListenableBuilder<int>(
-      valueListenable: presenceVersion,
-      builder: (_, __, ___) {
-        final p = presenceCache[id];
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        if (p == null || now - p.ts > 300) {
-          return const SizedBox.shrink();
-        }
-        final n = p.sessions.length;
-        final color = n == 0 ? Colors.grey : Colors.green;
-        final txt =
-            n == 0 ? 'libre' : '$n trabajando: ${p.sessions.join(';')}';
-        return Flexible(
-          child: Text(
-            '• $txt',
-            style: TextStyle(fontSize: 10, color: color),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ).marginOnly(left: 8),
-        );
-      },
     );
   }
 
@@ -309,44 +301,62 @@ class _PeerCardState extends State<_PeerCard>
                           style: Theme.of(context).textTheme.titleSmall,
                         )),
                       ]).marginOnly(top: isPortrait ? 0 : 2),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Tooltip(
-                              message: name,
-                              waitDuration: const Duration(seconds: 1),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  name,
-                                  style: isPortrait ? null : greyStyle,
-                                  textAlign: TextAlign.start,
-                                  overflow: TextOverflow.ellipsis,
+                      ValueListenableBuilder<int>(
+                        valueListenable: presenceVersion,
+                        builder: (_, __, ___) {
+                          // Sesiones activas que publico la PC (ej. P1;P2;P5).
+                          final subs =
+                              presenceSessionsOf(peer.id).join(';');
+                          return Row(
+                            children: [
+                              Flexible(
+                                child: Tooltip(
+                                  message: name,
+                                  waitDuration: const Duration(seconds: 1),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      name,
+                                      style: isPortrait ? null : greyStyle,
+                                      textAlign: TextAlign.start,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          if (showNote)
-                            Expanded(
-                              child: Tooltip(
-                                message: peer.note,
-                                waitDuration: const Duration(seconds: 1),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
+                              if (subs.isNotEmpty)
+                                Flexible(
                                   child: Text(
-                                    peer.note,
-                                    style: isPortrait ? null : greyStyle,
-                                    textAlign: TextAlign.start,
+                                    subs,
+                                    style: greyStyle.copyWith(
+                                        color: Colors.green),
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                  ).marginOnly(
-                                      left: peerCardUiType.value ==
-                                              PeerUiType.list
-                                          ? 32
-                                          : 4),
+                                  ).marginOnly(left: 4),
                                 ),
-                              ),
-                            )
-                        ],
+                              if (showNote)
+                                Expanded(
+                                  child: Tooltip(
+                                    message: peer.note,
+                                    waitDuration: const Duration(seconds: 1),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        peer.note,
+                                        style: isPortrait ? null : greyStyle,
+                                        textAlign: TextAlign.start,
+                                        overflow: TextOverflow.ellipsis,
+                                      ).marginOnly(
+                                          left: peerCardUiType.value ==
+                                                  PeerUiType.list
+                                              ? 32
+                                              : 4),
+                                    ),
+                                  ),
+                                )
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ).marginOnly(top: 2),
