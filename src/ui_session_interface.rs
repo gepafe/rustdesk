@@ -1861,7 +1861,7 @@ impl<T: InvokeUiSession> Interface for Session<T> {
         }
         // La bandera USUARIO PRIVADO viaja en platform_additions de la PC
         // remota (flutter.rs la lee al armar el evento de sesiones).
-        crate::flutter::REMOTE_PRIVATE_USER.store(
+        crate::ui_interface::REMOTE_PRIVATE_USER.store(
             !pi.platform_additions.is_empty()
                 && serde_json::from_str::<serde_json::Value>(&pi.platform_additions)
                     .ok()

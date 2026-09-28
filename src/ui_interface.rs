@@ -32,6 +32,13 @@ use crate::ipc;
 
 type Message = RendezvousMessage;
 
+/// Bandera USUARIO PRIVADO de la PC remota (llega en platform_additions del
+/// peer_info; la guarda ui_session_interface::handle_peer_info y la lee
+/// flutter.rs al armar el evento de sesiones). Vive acá porque flutter.rs no
+/// existe en los builds sin la feature flutter (i686).
+pub static REMOTE_PRIVATE_USER: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub type Children = Arc<Mutex<(bool, HashMap<(String, String), Child>)>>;
 
