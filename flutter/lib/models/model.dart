@@ -1485,10 +1485,7 @@ class FfiModel with ChangeNotifier {
       parent.target?.elevationModel.onPeerInfo(_pi);
     }
     if (connType == ConnType.defaultConn) {
-      setViewOnly(
-          peerId,
-          bind.sessionGetToggleOptionSync(
-              sessionId: sessionId, arg: kOptionToggleViewOnly));
+      setViewOnly(peerId, false);
       setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
       // Los botones VER/CONTROLAR de la tarjeta guardan la preferencia en la
