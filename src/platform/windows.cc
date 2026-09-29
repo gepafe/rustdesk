@@ -710,6 +710,59 @@ extern "C"
             wcsncpy_s(buf, bufSize, tmpStr.c_str(), tmpStr.size());
         }
     }
+
+    // Cliente propio: enumera TODAS las sesiones de Windows con usuario ya
+    // cargado (activas, conectadas o desconectadas), no solo las activas como
+    // hace get_available_session_ids. Se usa para la presencia en la lista de
+    // equipos, donde interesa ver quien esta logged in en cada PC.
+    void get_logged_in_session_ids(PWSTR buf, uint32_t bufSize) {
+        std::vector<std::wstring> sessionIds;
+        PWTS_SESSION_INFOA pInfos = NULL;
+        DWORD count = 0;
+
+        if (WTSEnumerateSessionsA(WTS_CURRENT_SERVER_HANDLE, 0, 1, &pInfos, &count)) {
+            for (DWORD i = 0; i < count; i++) {
+                auto info = pInfos[i];
+                if (info.pWinStationName == NULL) {
+                    continue;
+                }
+                if (info.SessionId == 0 || info.SessionId == 65535 || info.SessionId == 65536) {
+                    continue;
+                }
+                bool loggedIn = info.State == WTSActive || info.State == WTSConnected ||
+                                info.State == WTSDisconnected;
+                if (!loggedIn) {
+                    continue;
+                }
+                const wchar_t *type = nullptr;
+                if (!stricmp(info.pWinStationName, "console")) {
+                    type = L"Console";
+                } else if (!strnicmp(info.pWinStationName, "rdp", 3)) {
+                    type = L"RDP";
+                } else if (!strnicmp(info.pWinStationName, "ica", 3)) {
+                    type = L"ICA";
+                } else if (is_rdp_session_by_protocol(info.SessionId)) {
+                    type = L"RDP";
+                } else {
+                    continue;
+                }
+                sessionIds.push_back(std::wstring(type) + L":" + std::to_wstring(info.SessionId));
+            }
+            WTSFreeMemory(pInfos);
+        }
+
+        std::wstring tmpStr;
+        for (size_t i = 0; i < sessionIds.size(); i++) {
+            if (i > 0) {
+                tmpStr += L",";
+            }
+            tmpStr += sessionIds[i];
+        }
+
+        if (buf && !tmpStr.empty() && tmpStr.size() < bufSize) {
+            wcsncpy_s(buf, bufSize, tmpStr.c_str(), tmpStr.size());
+        }
+    }
 } // end of extern "C"
 
 // below copied from https://github.com/TigerVNC/tigervnc/blob/master/vncviewer/win32.c

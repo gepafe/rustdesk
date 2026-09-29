@@ -1047,41 +1047,91 @@ class InputModel {
         'buttons': 0,
       };
 
-  Map<String, dynamic> _getMouseEvent(PointerEvent evt, String type) {
-    final Map<String, dynamic> out = {};
-
-    bool hasStaleButtonsOnMouseUp =
-        type == _kMouseEventUp && evt.buttons == _lastButtons;
-
-    // Check update event type and set buttons to be sent.
-    int buttons = _lastButtons;
-    if (type == _kMouseEventMove) {
-      // flutter may emit move event if one button is pressed and another button
-      // is pressing or releasing.
-      if (evt.buttons != _lastButtons) {
-        // For simplicity
-        // Just consider 3 - 1 ((Left + Right buttons) - Left button)
-        // Do not consider 2 - 1 (Right button - Left button)
-        // or 6 - 5 ((Right + Mid buttons) - (Left + Mid buttons))
-        // and so on
-        buttons = evt.buttons - _lastButtons;
-        if (buttons > 0) {
-          type = _kMouseEventDown;
-        } else {
-          type = _kMouseEventUp;
-          buttons = -buttons;
-        }
-      }
-    } else {
-      if (evt.buttons != 0) {
-        buttons = evt.buttons;
+  /// Devuelve el primer boton de [mask] (izq, der, central, atras, adelante).
+  static int _firstMouseButton(int mask) {
+    for (final b in const [
+      kPrimaryMouseButton,
+      kSecondaryMouseButton,
+      kMiddleMouseButton,
+      kBackMouseButton,
+      kForwardMouseButton,
+    ]) {
+      if (mask & b != 0) {
+        return b;
       }
     }
-    _lastButtons = hasStaleButtonsOnMouseUp ? 0 : evt.buttons;
+    return 0;
+  }
 
+  /// Arma el evento de mouse a partir del estado real de los botones.
+  ///
+  /// Cliente personalizado: antes se restaba el estado anterior
+  /// (evt.buttons - _lastButtons), y con eso un simple MOVIMIENTO del puntero
+  /// se mandaba al remoto como "down" de un boton que el usuario nunca aprieto
+  /// (pasa al entrar a la imagen con el boton ya apretado, tipico al terminar
+  /// de conectar). Como ese "up" nunca llegaba al canvas, el boton derecho
+  /// quedaba apretado en la maquina remota con su menu contextual abierto.
+  /// Ahora los estados se comparan bit a bit: un "down" sale solo de un
+  /// PointerDownEvent real y un movimiento nunca inventa un boton apretado.
+  Map<String, dynamic> _getMouseEvent(PointerEvent evt, String type) {
+    final Map<String, dynamic> out = {};
+    final cur = evt.buttons;
+    int buttons = 0;
+    if (type == _kMouseEventDown) {
+      // Solo el boton que se acaba de apretar; el que ya estaba no se repite.
+      buttons = _firstMouseButton(cur & ~_lastButtons);
+      if (buttons == 0) {
+        type = _kMouseEventMove;
+      }
+      _lastButtons = cur;
+    } else if (type == _kMouseEventUp) {
+      // Solo el boton que se acaba de soltar.
+      buttons = _firstMouseButton(_lastButtons & ~cur);
+      if (buttons == 0) {
+        type = _kMouseEventMove;
+      }
+      _lastButtons = cur;
+    } else {
+      // Un movimiento NUNCA inventa un boton apretado: si el puntero entra (o
+      // vuelve) a la imagen con un boton ya apretado se ignora, porque en el
+      // remoto no hay nada apretado y el "up" de ese boton puede no llegar
+      // nunca a la imagen. Asi el cliente tampoco queda mostrando el boton
+      // apretado.
+      buttons = _lastButtons & cur;
+      _lastButtons &= cur;
+    }
     out['buttons'] = buttons;
     out['type'] = type;
     return out;
+  }
+
+  /// Cliente personalizado: manda soltar todos los botones del mouse.
+  ///
+  /// Se usa cuando el input estuvo bloqueado (por ejemplo con la lista de
+  /// sesiones de Windows abierta) o al cambiar de sesion: si un "down" se
+  /// mandando mientras no podia enviar el "up", el boton queda apretado en el
+  /// equipo remoto. Va directo por [bind] a proposito: tiene que salir
+  /// aunque el input siga bloqueado.
+  void releaseAllMouseButtons() {
+    _lastButtons = 0;
+    for (final b in const [
+      kSecondaryMouseButton,
+      kPrimaryMouseButton,
+      kMiddleMouseButton,
+      kBackMouseButton,
+      kForwardMouseButton,
+    ]) {
+      try {
+        bind.sessionSendMouse(
+            sessionId: sessionId,
+            msg: json.encode(modify({
+              'type': kMouseEventTypeUp,
+              'buttons': mouseButtonsToPeer(b),
+              'x': '0',
+              'y': '0',
+            })));
+      } catch (_) {}
+    }
   }
 
   /// Send a mouse tap event(down and up).

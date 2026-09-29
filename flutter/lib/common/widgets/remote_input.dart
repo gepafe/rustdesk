@@ -102,7 +102,6 @@ class _RawTouchGestureDetectorRegionState
   // `onDoubleTap()` does not provide the position of the tap event.
   Offset _lastPosOfDoubleTapDown = Offset.zero;
   bool _touchModePanStarted = false;
-  Offset _doubleFinerTapPosition = Offset.zero;
 
   // For mouse mode, we need to block the events when the cursor is in a blocked area.
   // So we need to cache the last tap down position.
@@ -260,29 +259,12 @@ class _RawTouchGestureDetectorRegionState
     }
   }
 
-  // for mobiles
+  // Cliente propio: el pulsón largo ya NO manda clic derecho a la PC remota.
+  // Ese clic salia solo (sin que el usuario lo pidiera) y dejaba el menu
+  // contextual de Windows abierto. Para el menu contextual se usa el boton
+  // derecho del mouse; en tactil, el menu del cliente.
   onLongPress() async {
-    if (isNotTouchBasedDevice()) {
-      return;
-    }
-    if (!ffi.ffiModel.isPeerMobile) {
-      if (handleTouch) {
-        final isMoved = await ffi.cursorModel
-            .move(_cacheLongPressPosition.dx, _cacheLongPressPosition.dy);
-        if (!isMoved) {
-          return;
-        }
-      } else {
-        if (shouldBlockMouseModeEvent()) {
-          return;
-        }
-      }
-      await inputModel.tap(MouseButtons.right);
-    } else {
-      // It's better to send a message to tell the controlled device that the long press event is triggered.
-      // We're now using a `TimerTask` in `InputService.kt` to decide whether to trigger the long press event.
-      // It's not accurate and it's better to use the same detection logic in the controlling side.
-    }
+    return;
   }
 
   onLongPressMoveUpdate(LongPressMoveUpdateDetails d) async {
@@ -299,27 +281,14 @@ class _RawTouchGestureDetectorRegionState
 
   onDoubleFinerTapDown(TapDownDetails d) async {
     lastDeviceKind = d.kind;
-    if (isNotTouchBasedDevice()) {
-      return;
-    }
-    _doubleFinerTapPosition = d.localPosition;
-    // ignore for desktop and mobile
+    // Cliente propio: el doble toque fino ya no hace nada (no manda clic
+    // derecho). Ver onLongPress().
   }
 
   onDoubleFinerTap(TapDownDetails d) async {
     lastDeviceKind = d.kind;
-    if (isNotTouchBasedDevice()) {
-      return;
-    }
-
-    // mobile mouse mode or desktop touch screen
-    final isMobileMouseMode = isMobile && !ffiModel.touchMode;
-    // We can't use `d.localPosition` here because it's always (0, 0) on desktop.
-    final isDesktopInRemoteRect = (isDesktop || isWebDesktop) &&
-        ffi.cursorModel.isInRemoteRect(_doubleFinerTapPosition);
-    if (isMobileMouseMode || isDesktopInRemoteRect) {
-      await inputModel.tap(MouseButtons.right);
-    }
+    // Cliente propio: el doble toque fino ya NO manda clic derecho (mismo
+    // motivo que el pulsón largo). Ver onLongPress().
   }
 
   onHoldDragStart(DragStartDetails d) async {

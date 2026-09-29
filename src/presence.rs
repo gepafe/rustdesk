@@ -19,11 +19,10 @@ fn token() -> String {
 fn own_sessions() -> Vec<String> {
     #[cfg(windows)]
     {
-        crate::platform::get_available_sessions(true)
-            .into_iter()
-            .map(|s| s.name)
-            .filter(|n| !n.is_empty())
-            .collect()
+        // Todas las sesiones con usuario cargado (activas, conectadas o
+        // desconectadas): es lo que el usuario quiere ver en la lista para
+        // saber a quien puede conectarse en cada equipo.
+        crate::platform::get_logged_in_session_names()
     }
     #[cfg(not(windows))]
     {

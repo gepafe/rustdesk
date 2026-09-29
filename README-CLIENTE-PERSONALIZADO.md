@@ -15,7 +15,18 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   `spawn_resume_watcher`). Guardado como hash `v1:salt:sha256` en la opción
   local `app-lock-pin`; el PIN queda en memoria para cifrar la sync. Las
   pestañas Seguridad/Red de Ajustes piden ese mismo PIN.
-- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad\n  (opción del servicio `private-user`); viaja en el evento\n  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo\n  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene\n  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`. La bandera\n  la publica la PC REMOTA en `platform_additions` (`src/server/connection.rs`,\n  `on_remote_authorized`), el controlador la guarda en\n  `crate::flutter::REMOTE_PRIVATE_USER` (`src/ui_session_interface.rs`,\n  `handle_peer_info`) y `flutter.rs` la usa al armar el evento (antes leía la\n  opción local del controlador = nunca se pedía 777). Requiere \"Compartir\n  sesiones RDP\" activo en la PC remota.", "oldString": "- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad\n  (opción del servicio `private-user`); viaja en el evento\n  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo\n  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene\n  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`.", "path": "C:\\PROYECTOS\\RUSTDESK\\rustdesk\\README-CLIENTE-PERSONALIZADO.md"
+- **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad
+  (opción del servicio `private-user`); viaja en el evento
+  `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo
+  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene
+  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`. La bandera
+  la publica la PC REMOTA en `platform_additions` (`src/server/connection.rs`,
+  `on_remote_authorized`), el controlador la guarda en
+  `crate::ui_interface::REMOTE_PRIVATE_USER` (`src/ui_session_interface.rs`,
+  `handle_peer_info`) y `flutter.rs` la usa al armar el evento (antes leía la
+  opción local del controlador = nunca se pedía 777; el static NO puede vivir en
+  `flutter.rs` porque el job i686 compila sin la feature `flutter`). Requiere
+  "Compartir sesiones RDP" activo en la PC remota.
 - **Modo vista por acción**: doble clic/clic siempre controla (limpia
   `view_only`); `VER SOLAMENTE` siempre abre en vista; el botón de la barra de
   sesión no se guarda (`peer_card.dart` `_connectControl`, `model.dart`
@@ -24,6 +35,19 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   bloquea en el FFI de la sesión (`inputBlocked`; gates en
   `flutter/lib/models/input_model.dart`: `inputKey`, `scroll`, `sendMouse`,
   `handleMouse`).
+- **Botón derecho fantasma (fix de fábrica)**: al conectar, un movimiento del
+  puntero con un botón "pendiente" se traducía en un clic derecho que quedaba
+  apretado en la PC remota (menú contextual de Windows abierto). Corregido en
+  tres capas: (1) `_getMouseEvent` (`flutter/lib/models/input_model.dart`) ya no
+  inventa botones —un movimiento solo mueve— y usa `_firstMouseButton` para no
+  mandar combinaciones; (2) `releaseAllMouseButtons()` se dispara al aparecer la
+  imagen de la sesión, al destrabar el input y cuando el remoto bloquea el input
+  (`model.dart`: setter `inputBlocked`, `updateBlockInputState`, `onEvent2UIRgba`);
+  (3) la PC remota lleva cuenta de los botones apretados
+  (`src/server/input_service.rs`: `MOUSE_BUTTONS_HELD`): cualquier movimiento sin
+  botón los suelta y también al desconectar. Además el pulsón largo y el doble
+  toque fino ya **no** mandan clic derecho (`flutter/lib/common/widgets/
+  remote_input.dart`): para el menú contextual se usa el botón derecho del mouse.
 - **Cursor remoto visible por defecto** (user-default `show_remote_cursor=Y`
   en `applyCustomClientDefaults`, `flutter/lib/common.dart`).
 - **Sin WebRTC por defecto** (`enable-webrtc=N` local; casilla en
@@ -43,10 +67,15 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   aplica), Desvincular, auto-sync cada 20 s en ambas direcciones. El archivo
   se **cifra con el PIN de la app** (sin PIN configurado va en claro).
 - **Presencia**: cada PC publica cada 2 min sus sesiones en `presencia.json`
-  del mismo repo (servicio, `src/presence.rs`); la lista muestra por fila
-  "N trabajando: nombres" o "libre". El subtítulo de cada fila (vista lista y
-  tarjeta) muestra `usuario@host;p1;p2;...` con las sesiones activas de la PC
-  remota (`presenceSessionsOf` en `github_sync.dart`).
+  del mismo repo (servicio, `src/presence.rs`); las entradas con más de 5 min
+  se ignoran. En la fila (vistas lista y tarjeta) todo va **en una sola línea**:
+  `EQUIPO  usuario@host  P1;P2;P5` (alias, equipo y sesiones en verde) más la
+  nota si existe, con tooltip al pasar el mouse (`presenceSessionsOf` en
+  `github_sync.dart`, render en `peer_card.dart`). La PC publica **todas** las
+  sesiones de Windows con usuario cargado —activas, conectadas o
+  desconectadas—, no solo las conectadas en ese momento: función nativa
+  `get_logged_in_session_ids` (`src/platform/windows.cc`) + wrapper
+  `get_logged_in_session_names` (`src/platform/windows.rs`).
 - **Monitoreo Telegram** por equipo + chequeo cada 10 s.
 - **Android**: APK firmado con clave fija (actualiza encima); `hasFragileUserData`
   para conservar datos al desinstalar.

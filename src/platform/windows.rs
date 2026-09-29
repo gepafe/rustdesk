@@ -1230,6 +1230,47 @@ pub fn get_available_sessions(name: bool) -> Vec<WindowsSession> {
     v
 }
 
+/// Cliente propio: nombres de TODAS las sesiones de Windows con usuario ya
+/// cargado (activas, conectadas o desconectadas), en el mismo formato que
+/// `get_available_sessions` ("Console: FARMACIA", "RDP: P5").
+///
+/// Se usa para la presencia en la lista de equipos: ahi interesa saber quien
+/// esta logged in en cada PC, no solo quien esta conectado en ese momento.
+pub fn get_logged_in_session_names() -> Vec<String> {
+    extern "C" {
+        fn get_logged_in_session_ids(buf: *mut wchar_t, buf_size: c_int);
+    }
+    const BUF_SIZE: c_int = 4096;
+    let mut buf: Vec<wchar_t> = vec![0; BUF_SIZE as usize];
+    let list = unsafe {
+        get_logged_in_session_ids(buf.as_mut_ptr(), BUF_SIZE);
+        String::from_utf16_lossy(&buf)
+    };
+    let mut v: Vec<String> = vec![];
+    let mut seen: Vec<u32> = vec![];
+    for part in list.trim_matches(char::from(0)).trim().split(',') {
+        let split: Vec<_> = part.split(':').collect();
+        if split.len() != 2 {
+            continue;
+        }
+        let sid: u32 = match split[1].parse() {
+            Ok(sid) => sid,
+            Err(_) => continue,
+        };
+        if seen.contains(&sid) {
+            continue;
+        }
+        seen.push(sid);
+        let username = get_session_username(sid);
+        if username.is_empty() {
+            // Sin usuario legible no aporta nada en la lista.
+            continue;
+        }
+        v.push(format!("{}: {}", split[0], username));
+    }
+    v
+}
+
 pub fn get_active_user_home() -> Option<PathBuf> {
     let username = get_active_username();
     if !username.is_empty() {

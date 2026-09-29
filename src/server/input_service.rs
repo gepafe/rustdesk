@@ -21,7 +21,7 @@ use std::sync::mpsc;
 use std::{
     convert::TryFrom,
     ops::{Deref, DerefMut},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicI32, Ordering},
     thread,
     time::{self, Duration, Instant},
 };
@@ -1105,6 +1105,41 @@ pub fn handle_mouse_(
     }
 }
 
+// Cliente personalizado: botones del mouse que el servicio tiene apretados en
+// esta maquina. El cliente deberia mandar siempre el "up" de cada "down", pero
+// si ese "up" se pierde (se corta la sesion a mitad de un arrastre, el input
+// queda bloqueado mientras se elige sesion de Windows, o el puntero entra a la
+// imagen con un boton ya apretado y su "up" va al widget anterior) el boton
+// queda colgando: en Windows el menu contextual queda abierto sin haber hecho
+// clic. Con este estado, cualquier movimiento sin botones apretados suelta lo
+// que quedo, y al desconectar se suelta todo.
+static MOUSE_BUTTONS_HELD: AtomicI32 = AtomicI32::new(0);
+
+/// Suelta los botones que el servicio tiene marcados como apretados.
+/// Devuelve el bitfield de los que solto (0 si no habia ninguno).
+fn release_held_mouse_buttons(en: &mut Enigo) -> i32 {
+    let held = MOUSE_BUTTONS_HELD.swap(0, Ordering::SeqCst);
+    if held == 0 {
+        return 0;
+    }
+    if held & MOUSE_BUTTON_LEFT != 0 {
+        en.mouse_up(MouseButton::Left);
+    }
+    if held & MOUSE_BUTTON_RIGHT != 0 {
+        en.mouse_up(MouseButton::Right);
+    }
+    if held & MOUSE_BUTTON_WHEEL != 0 {
+        en.mouse_up(MouseButton::Middle);
+    }
+    if held & MOUSE_BUTTON_BACK != 0 {
+        en.mouse_up(MouseButton::Back);
+    }
+    if held & MOUSE_BUTTON_FORWARD != 0 {
+        en.mouse_up(MouseButton::Forward);
+    }
+    held
+}
+
 pub fn handle_mouse_simulation_(evt: &MouseEvent, conn: i32) {
     if !active_mouse_(conn) {
         return;
@@ -1141,6 +1176,15 @@ pub fn handle_mouse_simulation_(evt: &MouseEvent, conn: i32) {
                     }
                 }
             }
+        }
+    }
+    // Cliente personalizado: si el cliente mueve el mouse sin ningun boton
+    // apretado, aqui no deberia quedar ninguno apretado. Si quedo algo (un
+    // "up" que nunca llego), se suelta ahora en vez de dejarlo colgado.
+    if evt_type == MOUSE_TYPE_MOVE && buttons == 0 {
+        let released = release_held_mouse_buttons(&mut en);
+        if released != 0 {
+            log::info!("release held mouse buttons: {:#x}", released);
         }
     }
     match evt_type {
@@ -1278,6 +1322,17 @@ pub fn handle_mouse_simulation_(evt: &MouseEvent, conn: i32) {
                     en.mouse_scroll_x(x);
                 }
             }
+        }
+        _ => {}
+    }
+    // Cliente personalizado: recordar que botones quedan apretados en la
+    // maquina, para poder soltarlos si el "up" del cliente se pierde.
+    match (evt_type, buttons) {
+        (MOUSE_TYPE_DOWN, b) if b != 0 => {
+            MOUSE_BUTTONS_HELD.fetch_or(b, Ordering::SeqCst);
+        }
+        (MOUSE_TYPE_UP, b) if b != 0 => {
+            MOUSE_BUTTONS_HELD.fetch_and(!b, Ordering::SeqCst);
         }
         _ => {}
     }
@@ -1434,6 +1489,18 @@ fn reset_input() {
 #[cfg(target_os = "macos")]
 pub fn reset_input_ondisconn() {
     QUEUE.exec_async(reset_input);
+    // Cliente personalizado: soltar cualquier boton que haya quedado apretado
+    // (un "up" perdido dejaba el menu contextual del remoto abierto).
+    release_all_mouse_buttons();
+}
+
+/// Suelta los botones del mouse sin esperar al lock de ENIGO: si en este
+/// instante lo tiene otro hilo, el estado queda anotado y lo suelta el primer
+/// movimiento del cliente.
+fn release_all_mouse_buttons() {
+    if let Ok(mut en) = ENIGO.try_lock() {
+        release_held_mouse_buttons(&mut en);
+    }
 }
 
 fn sim_rdev_rawkey_position(code: KeyCode, keydown: bool) {

@@ -172,7 +172,15 @@ class FfiModel with ChangeNotifier {
   bool get showMyCursor => _showMyCursor;
 
   set inputBlocked(v) {
+    final was = _inputBlocked;
     _inputBlocked = v;
+    // Cliente personalizado: si el input estaba bloqueado (por ejemplo con la
+    // lista de sesiones de Windows abierta) algun boton del mouse puede haber
+    // quedado apretado en el equipo remoto, porque el "up" no se pudo enviar.
+    // Al desbloquear, soltar todos.
+    if (was && !v) {
+      parent.target?.inputModel.releaseAllMouseButtons();
+    }
   }
 
   FfiModel(this.parent) {
@@ -1820,7 +1828,9 @@ class FfiModel with ChangeNotifier {
   }
 
   updateBlockInputState(Map<String, dynamic> evt, String peerId) {
-    _inputBlocked = evt['input_state'] == 'on';
+    // Por el setter: al desbloquear suelta los botones que puedan haber
+    // quedado apretados en el equipo remoto.
+    inputBlocked = evt['input_state'] == 'on';
     notifyListeners();
     try {
       BlockInputState.find(peerId).value = evt['input_state'] == 'on';
@@ -4126,6 +4136,11 @@ class FFI {
       ffiModel.cancelPendingRestoreTimer();
       ffiModel.resetRestartReconnectState();
       dialogManager.dismissAll();
+      // Cliente personalizado: ya se esta viendo la imagen del equipo, asi que
+      // la sesion esta activa. Soltar cualquier boton del mouse que haya
+      // quedado apretado (de una sesion anterior o de un "up" perdido) para que
+      // no aparezca el menu contextual del remoto abierto sin haber hecho clic.
+      inputModel.releaseAllMouseButtons();
       try {
         await canvasModel.updateViewStyle();
         await canvasModel.updateScrollStyle();
