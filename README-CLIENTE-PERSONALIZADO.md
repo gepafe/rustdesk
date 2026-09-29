@@ -35,18 +35,29 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   bloquea en el FFI de la sesión (`inputBlocked`; gates en
   `flutter/lib/models/input_model.dart`: `inputKey`, `scroll`, `sendMouse`,
   `handleMouse`).
-- **Botón derecho fantasma (fix de fábrica)**: al conectar, un movimiento del
-  puntero con un botón "pendiente" se traducía en un clic derecho que quedaba
-  apretado en la PC remota (menú contextual de Windows abierto). Corregido en
-  tres capas: (1) `_getMouseEvent` (`flutter/lib/models/input_model.dart`) ya no
-  inventa botones —un movimiento solo mueve— y usa `_firstMouseButton` para no
-  mandar combinaciones; (2) `releaseAllMouseButtons()` se dispara al aparecer la
-  imagen de la sesión, al destrabar el input y cuando el remoto bloquea el input
-  (`model.dart`: setter `inputBlocked`, `updateBlockInputState`, `onEvent2UIRgba`);
-  (3) la PC remota lleva cuenta de los botones apretados
-  (`src/server/input_service.rs`: `MOUSE_BUTTONS_HELD`): cualquier movimiento sin
-  botón los suelta y también al desconectar. Además el pulsón largo y el doble
-  toque fino ya **no** mandan clic derecho (`flutter/lib/common/widgets/
+- **Botón derecho fantasma (fix de raíz)**: la PC remota no debe recibir ninguna
+  acción de mouse o teclado que el usuario no haya hecho. El cliente lo cumplía
+  casi siempre, pero no al conectar: al llegar la primera imagen se dispara
+  `updateViewStyle()`/`updateScrollStyle()` → `setDisplay()` →
+  `inputModel.refreshMousePos()`, que le mandaba un movimiento del mouse con la
+  posición del puntero que estaba sobre la lista, no sobre el equipo. Además el
+  estado interno de botones (`_lastButtons`) se actualizaba en `_getMouseEvent()`
+  aunque el evento se descartara después (`isInputBlocked` con el 777 abierto, o
+  antes de que el cursor remoto tome control), con lo cual el cliente quedaba
+  creyendo que tenía un botón apretado que el remoto nunca recibió. Y la máscara
+  de botones se restaba como si fuera un número (`evt.buttons - _lastButtons`), de
+  modo que una transición que no era un solo botón (`3 - 1 = 2`, o sea derecho)
+  mandaba un `down` del botón equivocado. El fix está entero en
+  `flutter/lib/models/input_model.dart` y aplica una sola regla:
+  (1) bandera `_inputStarted` por sesión: hasta que el usuario no hace un gesto
+  real sobre la imagen (o escribe, o gira la rueda) no sale NADA hacia el
+  remoto, ni al conectar ni al aceptar el 777; (2) `isInputBlocked` se chequea
+  antes de tocar `_lastButtons`, para que el estado del cliente solo avance si el
+  evento se mandó de verdad; (3) la máscara se compara bit a bit con
+  `_firstMouseButton` y un movimiento nunca inventa un botón apretado. No hace
+  falta red de seguridad en la PC remota: con la regla anterior el remoto solo
+  puede tener apretado lo que el usuario apretó. Además el pulsón largo y el
+  doble toque fino ya **no** mandan clic derecho (`flutter/lib/common/widgets/
   remote_input.dart`): para el menú contextual se usa el botón derecho del mouse.
 - **Cursor remoto visible por defecto** (user-default `show_remote_cursor=Y`
   en `applyCustomClientDefaults`, `flutter/lib/common.dart`).

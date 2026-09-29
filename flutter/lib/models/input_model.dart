@@ -365,6 +365,7 @@ class InputModel {
               model.keyboardPerm &&
               !model.isViewCamera) {
             _sideButtonDownModels[mb] = model;
+            model._inputStarted = true;
             // Fire-and-forget to avoid blocking the platform channel handler.
             unawaited(model._sendMouseUnchecked(type, mb).catchError((Object e) {
               debugPrint('[InputModel] failed to send side button $type for $mb: $e');
@@ -450,6 +451,13 @@ class InputModel {
   int _lastButtons = 0;
   Offset lastMousePos = Offset.zero;
   int _lastWheelTsUs = 0;
+
+  // Cliente propio: el remoto no recibe NADA hasta que el usuario usa el equipo
+  // de verdad (un gesto del puntero sobre la imagen o una tecla). Antes, al
+  // conectar se le mandaban eventos que el usuario no pidio (por ejemplo el
+  // refresco de posicion que dispara el cambio de tamano de la imagen) y el
+  // remoto los tomaba como pulsaciones reales.
+  bool _inputStarted = false;
 
   // Wheel acceleration thresholds.
   static const int _wheelAccelFastThresholdUs = 40000; // 40ms
@@ -1031,6 +1039,7 @@ class InputModel {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     if (isInputBlocked) return;
+    _inputStarted = true;
     bind.sessionInputKey(
         sessionId: sessionId,
         name: name,
@@ -1105,35 +1114,6 @@ class InputModel {
     return out;
   }
 
-  /// Cliente personalizado: manda soltar todos los botones del mouse.
-  ///
-  /// Se usa cuando el input estuvo bloqueado (por ejemplo con la lista de
-  /// sesiones de Windows abierta) o al cambiar de sesion: si un "down" se
-  /// mandando mientras no podia enviar el "up", el boton queda apretado en el
-  /// equipo remoto. Va directo por [bind] a proposito: tiene que salir
-  /// aunque el input siga bloqueado.
-  void releaseAllMouseButtons() {
-    _lastButtons = 0;
-    for (final b in const [
-      kSecondaryMouseButton,
-      kPrimaryMouseButton,
-      kMiddleMouseButton,
-      kBackMouseButton,
-      kForwardMouseButton,
-    ]) {
-      try {
-        bind.sessionSendMouse(
-            sessionId: sessionId,
-            msg: json.encode(modify({
-              'type': kMouseEventTypeUp,
-              'buttons': mouseButtonsToPeer(b),
-              'x': '0',
-              'y': '0',
-            })));
-      } catch (_) {}
-    }
-  }
-
   /// Send a mouse tap event(down and up).
   Future<void> tap(MouseButtons button) async {
     await sendMouse('down', button);
@@ -1152,6 +1132,7 @@ class InputModel {
   Future<void> scroll(int y) async {
     if (isViewCamera) return;
     if (isInputBlocked) return;
+    _inputStarted = true;
     await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json
@@ -1176,6 +1157,7 @@ class InputModel {
   /// Used for side button releases that must go through even if permissions
   /// changed after the matching down was sent.
   Future<void> _sendMouseUnchecked(String type, MouseButtons button) async {
+    if (!_inputStarted) return;
     await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify({'type': type, 'buttons': button.value})));
@@ -1186,6 +1168,7 @@ class InputModel {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     if (isInputBlocked) return;
+    _inputStarted = true;
     await _sendMouseUnchecked(type, button);
   }
 
@@ -1341,6 +1324,10 @@ class InputModel {
     _stopFling = true;
     if (isViewOnly && !showMyCursor) return;
     if (e.kind != ui.PointerDeviceKind.mouse) return;
+    _inputStarted = true;
+    // Cliente propio: si el evento no se va a mandar, el estado de botones no
+    // puede avanzar (quedaria desincronizado con el remoto).
+    if (isInputBlocked) return;
 
     // May fix https://github.com/rustdesk/rustdesk/issues/13009
     if (isIOS && e.synthesized && e.position == Offset.zero && e.buttons == 0) {
@@ -1572,6 +1559,8 @@ class InputModel {
     _windowRect = null;
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
+    _inputStarted = true;
+    if (isInputBlocked) return;
 
     // Track mouse down events for duplicate detection on iOS.
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -1613,6 +1602,8 @@ class InputModel {
     if (isDesktop) _queryOtherWindowCoords = false;
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
+    _inputStarted = true;
+    if (isInputBlocked) return;
 
     if (_relativeMouse.enabled.value) {
       _relativeMouse.updatePointerRegionTopLeftGlobal(e);
@@ -1636,6 +1627,8 @@ class InputModel {
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
     if (e.kind != ui.PointerDeviceKind.mouse) return;
+    _inputStarted = true;
+    if (isInputBlocked) return;
 
     if (_relativeMouse.enabled.value) {
       _relativeMouse.updatePointerRegionTopLeftGlobal(e);
@@ -1949,6 +1942,7 @@ class InputModel {
     bool moveCanvas = true,
     bool edgeScroll = false,
   }) {
+    if (!_inputStarted) return null;
     if (isInputBlocked) return null;
     final evtToPeer = processEventToPeer(evt, offset,
         onExit: onExit, moveCanvas: moveCanvas, edgeScroll: edgeScroll);
