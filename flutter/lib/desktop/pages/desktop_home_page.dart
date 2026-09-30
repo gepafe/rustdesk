@@ -55,21 +55,139 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final RxBool _editHover = false.obs;
   final RxBool _block = false.obs;
 
+  // Panel izquierdo plegable (ID/contraseña/etc.): oculto por defecto, se
+  // abre con la flechita del borde izquierdo y se cierra solo cuando el
+  // mouse se va del panel (y de la flechita). Recuerda el último estado.
+  static const _kLeftPaneOpen = 'left-pane-open';
+  bool _leftPaneOpen = false;
+  bool _hoverLeftPane = false;
+  bool _hoverLeftRail = false;
+  Timer? _leftPaneHideTimer;
+
   final GlobalKey _childKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    // Modo "solo recibir": el panel izquierdo es toda la UI, se queda fijo.
+    if (isIncomingOnly) {
+      return _buildBlock(
+          child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildLeftPane(context),
+        ],
+      ));
+    }
+    // Modo normal: rail con la flechita + listado; el panel izquierdo se
+    // superpone (no empuja) para que el listado no se redimensione.
     return _buildBlock(
-        child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
       children: [
-        buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
-        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildLeftPaneRail(context),
+            const VerticalDivider(width: 1),
+            Expanded(child: buildRightPane(context)),
+          ],
+        ),
+        Positioned(
+          left: 22,
+          top: 0,
+          bottom: 0,
+          child: buildLeftPaneOverlay(context),
+        ),
       ],
     ));
+  }
+
+  // Rail angosto siempre visible con la flechita que abre/cierra el panel.
+  Widget buildLeftPaneRail(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _onLeftHoverChange(pane: false, value: true),
+      onExit: (_) => _onLeftHoverChange(pane: false, value: false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _setLeftPaneOpen(!_leftPaneOpen),
+        child: SizedBox(
+          width: 22,
+          child: Column(
+            children: [
+              const Spacer(),
+              Icon(
+                _leftPaneOpen ? Icons.chevron_left : Icons.chevron_right,
+                size: 20,
+                color: Colors.grey.withOpacity(0.6),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // El panel propiamente dicho: se anima de 0 a 250 de ancho y el contenido
+  // se mantiene maquetado a 250 (OverflowBox + clip) para que no se "plaste"
+  // al abrir/cerrar.
+  Widget buildLeftPaneOverlay(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _onLeftHoverChange(pane: true, value: true),
+      onExit: (_) => _onLeftHoverChange(pane: true, value: false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
+        width: _leftPaneOpen ? 250 : 0,
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.background,
+          boxShadow: _leftPaneOpen
+              ? const [
+                  BoxShadow(
+                    color: Colors.black38,
+                    blurRadius: 8,
+                    offset: Offset(3, 0),
+                  ),
+                ]
+              : null,
+        ),
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: 250,
+          maxWidth: 250,
+          child: buildLeftPane(context),
+        ),
+      ),
+    );
+  }
+
+  void _setLeftPaneOpen(bool open) {
+    if (!mounted || _leftPaneOpen == open) return;
+    setState(() {
+      _leftPaneOpen = open;
+    });
+    bind.mainSetLocalOption(key: _kLeftPaneOpen, value: open ? 'Y' : 'N');
+  }
+
+  // Mientras el mouse esté sobre el panel o la flechita no se cierra;
+  // al irse de los dos, espera 400 ms y pliega.
+  void _onLeftHoverChange({required bool pane, required bool value}) {
+    if (pane) {
+      _hoverLeftPane = value;
+    } else {
+      _hoverLeftRail = value;
+    }
+    _leftPaneHideTimer?.cancel();
+    if (!_hoverLeftPane && !_hoverLeftRail && _leftPaneOpen) {
+      _leftPaneHideTimer = Timer(const Duration(milliseconds: 400), () {
+        if (!_hoverLeftPane && !_hoverLeftRail) {
+          _setLeftPaneOpen(false);
+        }
+      });
+    }
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -718,6 +836,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    _leftPaneOpen = bind.mainGetLocalOption(key: _kLeftPaneOpen) == 'Y';
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
@@ -891,6 +1010,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void dispose() {
     _uniLinksSubscription?.cancel();
+    _leftPaneHideTimer?.cancel();
     Get.delete<RxBool>(tag: 'stop-service');
     _updateTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
