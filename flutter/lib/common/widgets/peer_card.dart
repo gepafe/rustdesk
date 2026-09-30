@@ -175,8 +175,8 @@ class _PeerCardState extends State<_PeerCard>
             child: ValueListenableBuilder<int>(
               valueListenable: presenceVersion,
               builder: (_, __, ___) {
-                // Todo en UNA sola linea: nombre del equipo, usuario@equipo y
-                // las sesiones que publico la PC (ej. MARIN ws00 P1;P2;P5).
+                // Todo en UNA sola linea: nombre del equipo y las sesiones
+                // unidas por ; (ej. MARIN P1@ws00;P2;P3;CAJA).
                 final subs = presenceSessionsOf(peer.id).join(';');
                 return Text.rich(
                   TextSpan(
@@ -187,13 +187,13 @@ class _PeerCardState extends State<_PeerCard>
                             : peer.alias,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
-                      if (name.isNotEmpty)
-                        TextSpan(text: '  $name', style: greyStyle),
                       if (subs.isNotEmpty)
                         TextSpan(
-                          text: '  $subs',
+                          text: name.isNotEmpty ? '  $name;$subs' : '  $subs',
                           style: greyStyle.copyWith(color: Colors.green),
-                        ),
+                        )
+                      else if (name.isNotEmpty)
+                        TextSpan(text: '  $name', style: greyStyle),
                     ],
                   ),
                   maxLines: 1,
@@ -308,16 +308,20 @@ class _PeerCardState extends State<_PeerCard>
                                       style:
                                           Theme.of(context).textTheme.titleSmall,
                                     ),
-                                    if (name.isNotEmpty)
+                                    // Sesiones unidas por ; al usuario@equipo
+                                    // (ej. MARIN P1@ws00;P2;P3;CAJA).
+                                    if (subs.isNotEmpty)
+                                      TextSpan(
+                                        text: name.isNotEmpty
+                                            ? '  $name;$subs'
+                                            : '  $subs',
+                                        style: greyStyle
+                                            .copyWith(color: Colors.green),
+                                      )
+                                    else if (name.isNotEmpty)
                                       TextSpan(
                                         text: '  $name',
                                         style: isPortrait ? null : greyStyle,
-                                      ),
-                                    if (subs.isNotEmpty)
-                                      TextSpan(
-                                        text: '  $subs',
-                                        style: greyStyle
-                                            .copyWith(color: Colors.green),
                                       ),
                                   ],
                                 ),

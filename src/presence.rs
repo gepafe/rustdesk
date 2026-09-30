@@ -88,11 +88,39 @@ fn upload(
         .header("Accept", "application/vnd.github+json")
         .json(&body)
         .send()?;
-    if resp.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
+    // 409 (conflicto: otra PC subio entre nuestra descarga y la subida) y
+    // 422 (sha ausente) => pedir sha fresco y reintentar, no abortar.
+    if resp.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY
+        || resp.status() == reqwest::StatusCode::CONFLICT
+    {
         return Ok(true);
     }
     resp.error_for_status()?;
     Ok(false)
+}
+
+fn publish_attempt(
+    client: &reqwest::blocking::Client,
+    token: &str,
+    id: &str,
+    sessions: &[String],
+) -> ResultType<bool> {
+    let (sha, mut map) = download(client, token)?;
+    // Podar entradas viejas para que el archivo no crezca sin cota.
+    let now = now_secs();
+    map.retain(|_, v| {
+        v.get("ts")
+            .and_then(|t| t.as_u64())
+            .map(|ts| now.saturating_sub(ts) <= 300)
+            .unwrap_or(false)
+    });
+    map.insert(
+        id.to_owned(),
+        serde_json::json!({"ts": now, "sessions": sessions}),
+    );
+    let content = serde_json::to_string(&map)?;
+    let content_b64 = crate::common::encode64(content.as_bytes());
+    upload(client, token, sha.as_deref(), &content_b64)
 }
 
 fn publish_once() -> ResultType<()> {
@@ -106,27 +134,22 @@ fn publish_once() -> ResultType<()> {
         return Ok(());
     }
     let sessions = own_sessions();
-    for _ in 0..2 {
-        let (sha, mut map) = download(&client, &token)?;
-        // Podar entradas viejas para que el archivo no crezca sin cota.
-        let now = now_secs();
-        map.retain(|_, v| {
-            v.get("ts")
-                .and_then(|t| t.as_u64())
-                .map(|ts| now.saturating_sub(ts) <= 300)
-                .unwrap_or(false)
-        });
-        map.insert(
-            id.clone(),
-            serde_json::json!({"ts": now_secs(), "sessions": sessions}),
-        );
-        let content = serde_json::to_string(&map)?;
-        let content_b64 = crate::common::encode64(content.as_bytes());
-        if !upload(&client, &token, sha.as_deref(), &content_b64)? {
-            return Ok(());
+    // Hasta 3 intentos: con 20 PCs publicando cada 2 min al mismo archivo es
+    // comun el 409 (sha vencido) y puede caerse una llamada de red; antes el
+    // primer 409 abortaba todo y la entrada se quedaba vieja (>5 min) por lo
+    // que las tarjetas no mostraban sesiones.
+    let mut last_err: Option<anyhow::Error> = None;
+    for _ in 0..3 {
+        match publish_attempt(&client, &token, &id, &sessions) {
+            Ok(false) => return Ok(()), // subida OK
+            Ok(true) => last_err = None, // conflicto de sha: reintentar
+            Err(e) => last_err = Some(e),
         }
     }
-    Ok(())
+    match last_err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }
 
 fn presence_loop() {
