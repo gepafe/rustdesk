@@ -417,15 +417,22 @@ class _PeersViewState extends State<_PeersView>
     for (final folder in fm.folders) {
       final members = peers.where((p) => folder.ids.contains(p.id)).toList();
       assigned.addAll(members.map((e) => e.id));
-      children.add(_FolderHeader(
-        name: folder.name,
-        total: members.length,
-        online: members.where((e) => e.online).length,
-        expanded: folder.expanded,
-        onTap: () => fm.toggleExpanded(folder.name),
-        onRename: () => showFolderRenameDialog(folder.name),
-        onDelete: () => showFolderDeleteDialog(folder.name),
-      ));
+      // En modo editar se muestran flechas para mover la carpeta entera.
+      children.add(Obx(() => _FolderHeader(
+            name: folder.name,
+            total: members.length,
+            online: members.where((e) => e.online).length,
+            expanded: folder.expanded,
+            onTap: () => fm.toggleExpanded(folder.name),
+            onRename: () => showFolderRenameDialog(folder.name),
+            onDelete: () => showFolderDeleteDialog(folder.name),
+            onUp: peerOrderEditMode.value
+                ? () => fm.moveFolder(folder.name, -1)
+                : null,
+            onDown: peerOrderEditMode.value
+                ? () => fm.moveFolder(folder.name, 1)
+                : null,
+          )));
       if (folder.expanded) {
         if (members.isEmpty) {
           children.add(Padding(
@@ -781,6 +788,8 @@ class _FolderHeader extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onRename;
   final VoidCallback? onDelete;
+  final VoidCallback? onUp;
+  final VoidCallback? onDown;
 
   const _FolderHeader({
     required this.name,
@@ -790,6 +799,8 @@ class _FolderHeader extends StatelessWidget {
     required this.onTap,
     this.onRename,
     this.onDelete,
+    this.onUp,
+    this.onDown,
   });
 
   @override
@@ -821,6 +832,27 @@ class _FolderHeader extends StatelessWidget {
               '$online/$total',
               style: TextStyle(fontSize: 12, color: labelColor),
             ),
+            if (onUp != null || onDown != null)
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up, size: 16),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 22, minHeight: 22),
+                  tooltip: 'Subir carpeta',
+                  onPressed: onUp,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 22, minHeight: 22),
+                  tooltip: 'Bajar carpeta',
+                  onPressed: onDown,
+                ),
+              ]),
             if (onRename != null || onDelete != null)
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_horiz, size: 18, color: labelColor),

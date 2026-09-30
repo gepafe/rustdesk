@@ -110,6 +110,19 @@ class PeerFolderModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Mueve una carpeta completa arriba/abajo en el orden de la lista.
+  /// [delta] -1 = subir, 1 = bajar. No hace nada si esta en los limites.
+  void moveFolder(String name, int delta) {
+    final i = folders.indexWhere((f) => f.name == name);
+    if (i < 0) return;
+    final j = i + delta;
+    if (j < 0 || j >= folders.length) return;
+    final f = folders.removeAt(i);
+    folders.insert(j, f);
+    save();
+    notifyListeners();
+  }
+
   void toggleExpanded(String name) {
     final f = folderByName(name);
     if (f == null) return;
