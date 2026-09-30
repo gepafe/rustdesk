@@ -173,6 +173,7 @@ class FfiModel with ChangeNotifier {
 
   set inputBlocked(v) {
     _inputBlocked = v;
+    traceInputDiag('-', 'inputBlocked=$v');
   }
 
   FfiModel(this.parent) {

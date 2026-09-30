@@ -731,6 +731,26 @@ async fn set_uinput_resolution(minx: i32, maxx: i32, miny: i32, maxy: i32) -> Re
     super::uinput::client::set_resolution(minx, maxx, miny, maxy).await
 }
 
+fn trace_input_line(line: &str) {
+    let path = if cfg!(target_os = "windows") {
+        std::path::PathBuf::from("C:\\Users\\Public\\rustdesk-input-trace-remote.log")
+    } else {
+        std::env::temp_dir().join("rustdesk-input-trace-remote.log")
+    };
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        use std::io::Write;
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(f, "{} {}", secs, line);
+    }
+}
+
 pub fn is_left_up(evt: &MouseEvent) -> bool {
     let buttons = evt.mask >> 3;
     let evt_type = evt.mask & MOUSE_TYPE_MASK;
@@ -1060,6 +1080,11 @@ fn active_mouse_(_conn: i32) -> bool {
 }
 
 pub fn handle_pointer_(evt: &PointerDeviceEvent, conn: i32) {
+    trace_input_line(&format!(
+        "POINTER conn={} union_some={}",
+        conn,
+        evt.union.is_some()
+    ));
     if !active_mouse_(conn) {
         return;
     }
@@ -1141,6 +1166,14 @@ fn release_held_mouse_buttons(en: &mut Enigo) -> i32 {
 }
 
 pub fn handle_mouse_simulation_(evt: &MouseEvent, conn: i32) {
+    trace_input_line(&format!(
+        "MOUSE type={} buttons={} x={} y={} conn={}",
+        evt.mask & MOUSE_TYPE_MASK,
+        evt.mask >> 3,
+        evt.x,
+        evt.y,
+        conn
+    ));
     if !active_mouse_(conn) {
         return;
     }
@@ -2364,6 +2397,10 @@ fn is_legacy_mode(evt: &KeyEvent) -> bool {
 }
 
 pub fn handle_key_(evt: &KeyEvent) {
+    trace_input_line(&format!(
+        "KEY name='{}' down={} down2={}",
+        evt.name, evt.down, evt.down2
+    ));
     if EXITING.load(Ordering::SeqCst) {
         return;
     }

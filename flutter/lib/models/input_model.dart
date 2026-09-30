@@ -28,6 +28,23 @@ const _kMouseEventDown = 'mousedown';
 const _kMouseEventUp = 'mouseup';
 const _kMouseEventMove = 'mousemove';
 
+// DEBUG temporal (v56): traza de input para diagnosticar el boton derecho
+// fantasma. Una linea por evento que sale al remoto (o que se descarta), en
+// C:\Users\Public\rustdesk-input-trace-cliente.log (Windows) o el TMPDIR.
+// Quitar cuando termine el diagnostico.
+void traceInputDiag(Object sessionId, String what) {
+  if (isMobile) return;
+  try {
+    final dir = Platform.isWindows
+        ? 'C:\\Users\\Public'
+        : (Platform.environment['TMPDIR'] ?? '/tmp');
+    File('$dir${Platform.pathSeparator}rustdesk-input-trace-cliente.log')
+        .writeAsStringSync(
+            '${DateTime.now().toIso8601String()} [$sessionId] $what\n',
+            mode: FileMode.append);
+  } catch (_) {}
+}
+
 class CanvasCoords {
   double x = 0;
   double y = 0;
@@ -365,7 +382,7 @@ class InputModel {
               model.keyboardPerm &&
               !model.isViewCamera) {
             _sideButtonDownModels[mb] = model;
-            model._inputStarted = true;
+            model._markInputStarted('boton lateral down');
             // Fire-and-forget to avoid blocking the platform channel handler.
             unawaited(model._sendMouseUnchecked(type, mb).catchError((Object e) {
               debugPrint('[InputModel] failed to send side button $type for $mb: $e');
@@ -458,6 +475,13 @@ class InputModel {
   // refresco de posicion que dispara el cambio de tamano de la imagen) y el
   // remoto los tomaba como pulsaciones reales.
   bool _inputStarted = false;
+
+  void _markInputStarted(String fuente) {
+    if (!_inputStarted) {
+      _inputStarted = true;
+      traceInputDiag(sessionId, 'INPUT-empezo por $fuente');
+    }
+  }
 
   // Wheel acceleration thresholds.
   static const int _wheelAccelFastThresholdUs = 40000; // 40ms
@@ -1039,7 +1063,8 @@ class InputModel {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     if (isInputBlocked) return;
-    _inputStarted = true;
+    _markInputStarted('inputKey');
+    traceInputDiag(sessionId, 'KEY name=$name down=$down press=$press');
     bind.sessionInputKey(
         sessionId: sessionId,
         name: name,
@@ -1132,7 +1157,8 @@ class InputModel {
   Future<void> scroll(int y) async {
     if (isViewCamera) return;
     if (isInputBlocked) return;
-    _inputStarted = true;
+    _markInputStarted('scroll');
+    traceInputDiag(sessionId, 'WHEEL scroll y=$y');
     await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json
@@ -1158,6 +1184,7 @@ class InputModel {
   /// changed after the matching down was sent.
   Future<void> _sendMouseUnchecked(String type, MouseButtons button) async {
     if (!_inputStarted) return;
+    traceInputDiag(sessionId, 'SEND.directo type=$type button=$button');
     await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify({'type': type, 'buttons': button.value})));
@@ -1168,7 +1195,7 @@ class InputModel {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     if (isInputBlocked) return;
-    _inputStarted = true;
+    _markInputStarted('sendMouse');
     await _sendMouseUnchecked(type, button);
   }
 
@@ -1202,6 +1229,7 @@ class InputModel {
 
   /// Send mouse movement event with distance in [x] and [y].
   Future<void> moveMouse(double x, double y) async {
+    traceInputDiag(sessionId, 'MOV.moveMouse x=$x y=$y');
     if (!keyboardPerm) return;
     if (isViewCamera) return;
     var x2 = x.toInt();
@@ -1324,7 +1352,7 @@ class InputModel {
     _stopFling = true;
     if (isViewOnly && !showMyCursor) return;
     if (e.kind != ui.PointerDeviceKind.mouse) return;
-    _inputStarted = true;
+    _markInputStarted('hover');
     // Cliente propio: si el evento no se va a mandar, el estado de botones no
     // puede avanzar (quedaria desincronizado con el remoto).
     if (isInputBlocked) return;
@@ -1559,7 +1587,7 @@ class InputModel {
     _windowRect = null;
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
-    _inputStarted = true;
+    _markInputStarted('down puntero');
     if (isInputBlocked) return;
 
     // Track mouse down events for duplicate detection on iOS.
@@ -1602,7 +1630,7 @@ class InputModel {
     if (isDesktop) _queryOtherWindowCoords = false;
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
-    _inputStarted = true;
+    _markInputStarted('up puntero');
     if (isInputBlocked) return;
 
     if (_relativeMouse.enabled.value) {
@@ -1627,7 +1655,7 @@ class InputModel {
     if (isViewOnly && !showMyCursor) return;
     if (isViewCamera) return;
     if (e.kind != ui.PointerDeviceKind.mouse) return;
-    _inputStarted = true;
+    _markInputStarted('move puntero');
     if (isInputBlocked) return;
 
     if (_relativeMouse.enabled.value) {
@@ -1750,19 +1778,25 @@ class InputModel {
     }
   }
 
-  void refreshMousePos() => handleMouse({
+  void refreshMousePos() {
+    traceInputDiag(sessionId, 'MOV.refresh last=$lastMousePos');
+    handleMouse({
+      'buttons': 0,
+      'type': _kMouseEventMove,
+    }, lastMousePos, edgeScroll: useEdgeScroll);
+  }
+
+  void tryMoveEdgeOnExit(Offset pos) {
+    traceInputDiag(sessionId, 'MOV.edge pos=$pos');
+    handleMouse(
+      {
         'buttons': 0,
         'type': _kMouseEventMove,
-      }, lastMousePos, edgeScroll: useEdgeScroll);
-
-  void tryMoveEdgeOnExit(Offset pos) => handleMouse(
-        {
-          'buttons': 0,
-          'type': _kMouseEventMove,
-        },
-        pos,
-        onExit: true,
-      );
+      },
+      pos,
+      onExit: true,
+    );
+  }
 
   static double tryGetNearestRange(double v, double min, double max, double n) {
     if (v < min && v >= min - n) {
@@ -1942,11 +1976,19 @@ class InputModel {
     bool moveCanvas = true,
     bool edgeScroll = false,
   }) {
-    if (!_inputStarted) return null;
-    if (isInputBlocked) return null;
+    if (!_inputStarted) {
+      traceInputDiag(sessionId, 'DROP.handleMouse aun-sin-gesto');
+      return null;
+    }
+    if (isInputBlocked) {
+      traceInputDiag(sessionId, 'DROP.handleMouse bloqueado');
+      return null;
+    }
     final evtToPeer = processEventToPeer(evt, offset,
         onExit: onExit, moveCanvas: moveCanvas, edgeScroll: edgeScroll);
     if (evtToPeer != null) {
+      traceInputDiag(sessionId,
+          'SEND type=${evtToPeer['type']} buttons=${evtToPeer['buttons']}');
       bind.sessionSendMouse(
           sessionId: sessionId, msg: json.encode(modify(evtToPeer)));
     }
