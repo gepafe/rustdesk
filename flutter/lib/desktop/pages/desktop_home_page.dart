@@ -104,23 +104,34 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   // Rail angosto siempre visible con la flechita que abre/cierra el panel.
+  // Fondo CLARO (a propósito) para que se note que es clicable aunque el
+  // tema sea oscuro; al pasar el mouse se aclara más y la flecha se pone
+  // color de acento.
   Widget buildLeftPaneRail(BuildContext context) {
+    final bool open = _leftPaneOpen;
     return MouseRegion(
       onEnter: (_) => _onLeftHoverChange(pane: false, value: true),
       onExit: (_) => _onLeftHoverChange(pane: false, value: false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _setLeftPaneOpen(!_leftPaneOpen),
-        child: SizedBox(
+        onTap: () => _setLeftPaneOpen(!open),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
           width: 22,
+          color: _hoverLeftRail
+              ? const Color(0xFFF4F6FC) // claro con hover
+              : const Color(0xFFDFE2EA), // claro en reposo
           child: Column(
             children: [
               const Spacer(),
               Icon(
-                _leftPaneOpen ? Icons.chevron_left : Icons.chevron_right,
-                size: 20,
-                color: Colors.grey.withOpacity(0.6),
+                open ? Icons.chevron_left : Icons.chevron_right,
+                size: 22,
+                color: _hoverLeftRail
+                    ? const Color(0xFF1A73E8) // acento al pasar el mouse
+                    : const Color(0xFF55555F),
               ),
               const Spacer(),
             ],
@@ -175,10 +186,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   // Mientras el mouse esté sobre el panel o la flechita no se cierra;
   // al irse de los dos, espera 400 ms y pliega.
   void _onLeftHoverChange({required bool pane, required bool value}) {
-    if (pane) {
-      _hoverLeftPane = value;
-    } else {
-      _hoverLeftRail = value;
+    if (mounted) {
+      // setState para que el rail repinte su color de hover.
+      setState(() {
+        if (pane) {
+          _hoverLeftPane = value;
+        } else {
+          _hoverLeftRail = value;
+        }
+      });
     }
     _leftPaneHideTimer?.cancel();
     if (!_hoverLeftPane && !_hoverLeftRail && _leftPaneOpen) {
