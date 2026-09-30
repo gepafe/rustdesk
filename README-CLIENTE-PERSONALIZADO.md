@@ -18,8 +18,13 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
 - **PIN 777 por equipo**: casilla `USUARIO PRIVADO` en Ajustes → Seguridad
   (opción del servicio `private-user`); viaja en el evento
   `set_multiple_windows_session` (`src/flutter.rs`) y el diálogo
-  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 solo si viene
-  marcada. Clave: `kOptionPrivateUser` en `flutter/lib/consts.dart`. La bandera
+  (`flutter/lib/common/widgets/dialog.dart`) pide la clave 777 **solo según la
+  casilla**: viene tildada por defecto (sin tocar = pide la clave; `option2bool`
+  trata `""` como true) y un `N` explícito (casilla quitada) hace que **nunca**
+  pida. La regla vieja por nombre (`PC*`/`P<n>` sin clave) fue eliminada — era
+  la causa de que PCs con sesión `FARMACIA`/`PAOLA`/`CAJA` siguieran pidiendo
+  777 con el tilde quitado. Clave: `kOptionPrivateUser` en
+  `flutter/lib/consts.dart`. La bandera
   la publica la PC REMOTA en `platform_additions` (`src/server/connection.rs`,
   `on_remote_authorized`), el controlador la guarda en
   `crate::ui_interface::REMOTE_PRIVATE_USER` (`src/ui_session_interface.rs`,

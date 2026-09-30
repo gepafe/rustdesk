@@ -215,7 +215,10 @@ const String kOptionDisableUnlockPin = "disable-unlock-pin";
 // Cliente personalizado: PIN propio para desbloquear la app al abrirla
 // (separado del PIN de la sesión de Seguridad).
 const String kOptionAppLockPin = "app-lock-pin";
-// Maquina marcada como "USUARIO PRIVADO": al conectarse a ella se pide la clave 777.
+// Maquina con "USUARIO PRIVADO": al conectarse a ella se pide la clave 777.
+// La casilla es la UNICA que decide (la regla vieja por nombre PC*/P<n> se
+// elimino): viene tildada por default (sin tocar = pide clave) y solo un "N"
+// explicito (casilla quitada) hace que nunca pida.
 const String kOptionPrivateUser = "private-user";
 const String kOptionAppLockResumeCount = "app-lock-pin-resume-count";
 const String kOptionAppLockAskedCount = "app-lock-pin-asked-count";

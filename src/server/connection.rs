@@ -1960,9 +1960,11 @@ impl Connection {
             );
             // La PC que recibe la conexión publica su casilla USUARIO PRIVADO
             // para que el controlador pida la clave 777 al elegir sesión.
+            // Viene tildada por defecto: solo un "N" explicito (casilla
+            // quitada en Ajustes -> Seguridad) la desactiva.
             platform_additions.insert(
                 "private_user".into(),
-                json!(Config::get_option("private-user") == "Y"),
+                json!(Config::get_option("private-user") != "N"),
             );
         }
         #[cfg(target_os = "macos")]

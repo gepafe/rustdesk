@@ -2409,32 +2409,6 @@ void enter2FaDialog(
 }
 
 // This dialog should not be dismissed, otherwise it will be black screen, have not reproduced this.
-// El nombre de la sesion llega como "rdp: PC05" (tipo de sesion + usuario), asi
-// que la regla "PC..." se evalua sobre el usuario y no sobre el prefijo.
-bool _sessionIsPc(String name) {
-  bool matches(String s) {
-    final v = s.trim().toUpperCase();
-    if (v.startsWith('PC')) {
-      return true;
-    }
-    // Tambien 'P' seguida de un numero (P1, P05, ...).
-    if (v.startsWith('P') && v.length > 1) {
-      return int.tryParse(v.substring(1)) != null;
-    }
-    return false;
-  }
-
-  final trimmed = name.trim();
-  if (matches(trimmed)) {
-    return true;
-  }
-  final i = trimmed.indexOf(':');
-  if (i < 0) {
-    return false;
-  }
-  return matches(trimmed.substring(i + 1));
-}
-
 void showWindowsSessionsDialog(
     String type,
     String title,
@@ -2457,10 +2431,6 @@ void showWindowsSessionsDialog(
     names.add(session['name']);
   }
   String selectedUserValue = sids.first;
-  String selectedName() {
-    final i = sids.indexOf(selectedUserValue);
-    return i >= 0 && i < names.length ? names[i] : '';
-  }
 
   void sendSelected() {
     onSessionChosen?.call();
@@ -2468,9 +2438,9 @@ void showWindowsSessionsDialog(
         sessionId: sessionId, sid: selectedUserValue);
   }
 
-  // Con una sola sesion "PC..." no hace falta molestar con el dialogo: se
-  // conecta directo. El resto si pasa por el dialogo (y la clave 777).
-  if (names.length == 1 && !privateUser && _sessionIsPc(names.first)) {
+  // La casilla USUARIO PRIVADO manda sola: si no esta tildada no hace falta
+  // molestar con el dialogo (una sola sesion se conecta directo).
+  if (names.length == 1 && !privateUser) {
     dialogManager.dismissAll();
     sendSelected();
     return;
@@ -2479,9 +2449,9 @@ void showWindowsSessionsDialog(
   dialogManager.dismissAll();
   dialogManager.show((setState, close, context) {
     submit() {
-      // Las sesiones cuyo usuario empieza con "PC" entran sin clave; el resto
-      // pide la clave de acceso antes de conectar.
-      if (!privateUser && _sessionIsPc(selectedName())) {
+      // Si la casilla esta quitada, la sesion entra sin clave 777; si viene
+      // marcada (es el default) pide la clave antes de conectar.
+      if (!privateUser) {
         sendSelected();
         close();
         return;
