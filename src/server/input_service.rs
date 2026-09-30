@@ -2405,6 +2405,7 @@ pub fn handle_key_(evt: &KeyEvent) {
         Some(key_event::Union::Unicode(chr)) => format!("Unicode({})", chr),
         Some(key_event::Union::Seq(seq)) => format!("Seq({})", seq),
         Some(key_event::Union::Win2winHotkey(code)) => format!("Win2winHotkey({})", code),
+        Some(_) => "otro".to_owned(),
         None => "None".to_owned(),
     };
     trace_input_line(&format!(
