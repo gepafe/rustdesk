@@ -2399,7 +2399,7 @@ fn is_legacy_mode(evt: &KeyEvent) -> bool {
 pub fn handle_key_(evt: &KeyEvent) {
     // Traza de diagnostico: KeyEvent de este proto no tiene name/down2, solo
     // down/press y el oneof union.
-    let trace_key = match evt.union {
+    let trace_key = match &evt.union {
         Some(key_event::Union::ControlKey(ck)) => format!("ControlKey({:?})", ck),
         Some(key_event::Union::Chr(chr)) => format!("Chr({})", chr),
         Some(key_event::Union::Unicode(chr)) => format!("Unicode({})", chr),
