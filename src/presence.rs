@@ -137,8 +137,9 @@ fn publish_once() -> ResultType<()> {
     // Hasta 3 intentos: con 20 PCs publicando cada 2 min al mismo archivo es
     // comun el 409 (sha vencido) y puede caerse una llamada de red; antes el
     // primer 409 abortaba todo y la entrada se quedaba vieja (>5 min) por lo
-    // que las tarjetas no mostraban sesiones.
-    let mut last_err: Option<anyhow::Error> = None;
+    // que las tarjetas no mostraban sesiones. (El tipo lo infiere Rust del
+    // error de publish_attempt, que es el ResultType de hbb_common.)
+    let mut last_err = None;
     for _ in 0..3 {
         match publish_attempt(&client, &token, &id, &sessions) {
             Ok(false) => return Ok(()), // subida OK
