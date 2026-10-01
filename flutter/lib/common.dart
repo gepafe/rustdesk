@@ -2624,7 +2624,9 @@ connect(BuildContext context, String id,
     String? connToken,
     bool? isSharedPassword}) async {
   if (id == '') return;
-  if (!isDesktop || desktopType == DesktopType.main) {
+  // En desktop no se rellena el campo "Equipo remoto": queda vacio salvo
+  // que el usuario lo tipee a mano (solo en movil/web se refleja el id).
+  if (!isDesktop) {
     try {
       if (Get.isRegistered<IDTextEditingController>()) {
         final idController = Get.find<IDTextEditingController>();
