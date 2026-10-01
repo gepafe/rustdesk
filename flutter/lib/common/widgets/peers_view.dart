@@ -315,10 +315,11 @@ class _PeersViewState extends State<_PeersView>
                         controller: _scrollController,
                         itemCount: peers.length,
                         itemBuilder: (BuildContext context, int index) {
+                          // Filas lo mas pegadas posible (vista lista).
                           return buildOnePeer(peers[index], false).marginOnly(
                               right: space,
-                              top: index == 0 ? 0 : space / 4,
-                              bottom: space / 4);
+                              top: 0,
+                              bottom: 1);
                         },
                       )
                     : DynamicGridView.builder(
@@ -408,10 +409,12 @@ class _PeersViewState extends State<_PeersView>
     final children = <Widget>[];
 
     void addPeer(Peer p) {
-      // En vista de lista, filas mas juntas para que entren mas equipos.
-      final v = peerCardUiType.value == PeerUiType.list ? space / 4 : space / 2;
-      children.add(
-          buildOnePeer(p, false).marginOnly(right: space, top: v, bottom: v));
+      // En vista de lista, filas lo mas pegadas posible para que entren mas.
+      final isList = peerCardUiType.value == PeerUiType.list;
+      children.add(buildOnePeer(p, false).marginOnly(
+          right: space,
+          top: isList ? 0 : space / 2,
+          bottom: isList ? 1 : space / 2));
     }
 
     for (final folder in fm.folders) {
@@ -436,7 +439,7 @@ class _PeersViewState extends State<_PeersView>
       if (folder.expanded) {
         if (members.isEmpty) {
           children.add(Padding(
-            padding: const EdgeInsets.only(left: 30, top: 2, bottom: 6),
+            padding: const EdgeInsets.only(left: 30, top: 1, bottom: 2),
             child: Text(translate('Sin equipos'),
                 style: TextStyle(
                     fontSize: 12, color: Theme.of(context).tabBarTheme.labelColor)),
@@ -809,7 +812,7 @@ class _FolderHeader extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         child: Row(
           children: [
             Icon(
