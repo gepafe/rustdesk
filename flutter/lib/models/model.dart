@@ -4204,6 +4204,8 @@ class FFI {
     inputModel.disposeSideButtonTracking();
     if (closeSession) {
       await bind.sessionClose(sessionId: sessionId);
+      // Al cerrar la sesion, el campo "Equipo remoto" queda vacio (desktop).
+      if (isDesktop) clearRemoteIdField();
     }
     debugPrint('model $id closed');
     id = '';

@@ -2608,6 +2608,19 @@ connectMainDesktop(String id,
   }
 }
 
+/// Limpia el campo "Equipo remoto" de la columna izquierda (solo desktop).
+/// Se llama cuando se cierra una sesion para que no quede guardado ningun id.
+void clearRemoteIdField() {
+  try {
+    if (Get.isRegistered<IDTextEditingController>()) {
+      Get.find<IDTextEditingController>().clear();
+    }
+    if (Get.isRegistered<TextEditingController>()) {
+      Get.find<TextEditingController>().clear();
+    }
+  } catch (_) {}
+}
+
 /// Connect to a peer with [id].
 /// If [isFileTransfer], starts a session only for file transfer.
 /// If [isViewCamera], starts a session only for view camera.
