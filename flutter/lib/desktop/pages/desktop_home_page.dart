@@ -333,10 +333,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       child: Column(
         children: [
           Expanded(child: PeerTabPage()),
-          // Kept mounted (hidden) so its timer keeps updating
-          // `stateGlobal.videoConnCount`, but the "Ready" status bar is gone.
-          if (!isOutgoingOnly)
-            const Offstage(offstage: true, child: OnlineStatusWidget()),
+          // Barra de estado inferior: "Listo" con circulito verde y
+          // aviso si no hay internet o si esta caido el servidor de
+          // RustDesk (su timer tambien actualiza videoConnCount).
+          if (!isOutgoingOnly) ...[
+            const Divider(height: 1),
+            const OnlineStatusWidget(),
+          ],
         ],
       ),
     );

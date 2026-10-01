@@ -10,6 +10,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 
@@ -35,6 +36,13 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   final _svcIsUsingPublicServer = true.obs;
   Timer? _updateTimer;
 
+  // Estado de la red, chequeado cada 15 s:
+  //  _netOk = hay internet (al menos un host responde)
+  //  _rsOk  = responde el servidor de RustDesk (rs-ny)
+  final _netOk = true.obs;
+  final _rsOk = true.obs;
+  int _netTick = 0;
+
   double get em => 14.0;
   double? get height => bind.isIncomingOnly() ? null : em * 3;
 
@@ -43,7 +51,37 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     super.initState();
     _updateTimer = periodic_immediate(Duration(seconds: 1), () async {
       updateStatus();
+      // Cada 15 s se chequea si hay internet y si responde el servidor
+      // de RustDesk, para avisar en la barra de estado inferior.
+      if (++_netTick >= 15) {
+        _netTick = 0;
+        _checkConnectivity();
+      }
     });
+  }
+
+  // Devuelve el codigo HTTP o null si nadie contesto (sin internet).
+  Future<int?> _httpStatus(String url) async {
+    try {
+      final resp =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
+      return resp.statusCode;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _checkConnectivity() async {
+    final results = await Future.wait([
+      _httpStatus('https://api.github.com/'),
+      // Raíz + ws/id: el backend da 502/504 cuando el rendezvous esta caido.
+      _httpStatus('https://rs-ny.rustdesk.com/ws/id'),
+    ]);
+    final gh = results[0];
+    final rs = results[1];
+    // Sin internet solo si NINGUN host contesta.
+    _netOk.value = gh != null || rs != null;
+    _rsOk.value = rs != null && rs != 502 && rs != 504;
   }
 
   @override
@@ -75,12 +113,19 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               width: 8,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
-                color: _svcStopped.value ||
-                        stateGlobal.svcStatus.value == SvcStatus.connecting
-                    ? kColorWarn
-                    : (stateGlobal.svcStatus.value == SvcStatus.ready
-                        ? Color.fromARGB(255, 50, 190, 166)
-                        : Color.fromARGB(255, 224, 79, 95)),
+                color: !_netOk.value
+                    // Sin internet: circulito rojo.
+                    ? Color.fromARGB(255, 224, 79, 95)
+                    : (!_rsOk.value ||
+                            _svcStopped.value ||
+                            stateGlobal.svcStatus.value ==
+                                SvcStatus.connecting)
+                        // Servidor RustDesk caido o servicio detenido: naranja.
+                        ? kColorWarn
+                        : (stateGlobal.svcStatus.value == SvcStatus.ready
+                            // Todo listo: verde.
+                            ? Color.fromARGB(255, 50, 190, 166)
+                            : Color.fromARGB(255, 224, 79, 95)),
               ),
             ).marginSymmetric(horizontal: em),
             Container(
@@ -110,6 +155,16 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   _buildConnStatusMsg() {
     widget.onSvcStatusChanged?.call();
+    // Avisos de red, con prioridad sobre el estado del servicio.
+    if (!_netOk.value) {
+      return Text('Sin conexión a internet',
+          style:
+              TextStyle(fontSize: em, color: Color.fromARGB(255, 224, 79, 95)));
+    }
+    if (!_rsOk.value) {
+      return Text('Servidor RustDesk caído',
+          style: TextStyle(fontSize: em, color: kColorWarn));
+    }
     return Text(
       _svcStopped.value
           ? translate("Service is not running")
