@@ -77,14 +77,23 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   sin barra "Listo", sin barra de pestaña única, sin subtítulos "Sesiones".
 - **Copia de seguridad** (Ajustes → About / final de Ajustes en móvil):
   exporta/importa todo el config dir como texto (incluye `peers/`).
-- **Sync con GitHub** (Ajustes → Sincronizar con GitHub): repo fijo
-  `vitalfix/rustdesk-listas` + token embebido; un campo Nombre
-  (`equipos-<nombre>.json`), botón Vincular (crea o combina por fecha y
-  aplica), Desvincular, auto-sync cada 20 s en ambas direcciones. El archivo
-  se **cifra con el PIN de la app** (sin PIN configurado va en claro).
+- **Sync de listas con servidor propio** (Ajustes → Sincronizar listas): ya NO
+  usa GitHub. Todo pasa por la VPS propia `https://147.15.111.14:21121`
+  (API compatible con el subconjunto de GitHub Contents, servicio Python en
+  `/opt/rustdesk-listas/servidor.py`, systemd `rustdesk-listas.service`).
+  Un campo Nombre (`equipos-<nombre>.json`), botón Vincular (crea o combina
+  por fecha y aplica), Desvincular, auto-sync cada 20 s en ambas direcciones.
+  El archivo se **cifra con el PIN de la app** (sin PIN configurado va en
+  claro). Seguridad del canal (decisión del dueño): **HTTPS con certificado
+  autofirmado fijado por huella (pinning)** — en Dart,
+  `_kSyncCertPin` (sha256 del DER) en `github_sync.dart`; en Rust,
+  `CERT_PEM` como única raíz de confianza en `src/presence.rs`. Un cert
+  distinto ⇒ rechazo, nunca se manda el token. El token
+  (`SYNC_TOKEN`) **no está en el código**: lo inyecta CI en el build
+  (ver "Secretos" abajo).
 - **Presencia**: cada PC publica cada 2 min sus sesiones en `presencia.json`
-  del mismo repo (servicio, `src/presence.rs`); las entradas con más de 5 min
-  se ignoran. En la fila (vistas lista y tarjeta) todo va **en una sola línea**:
+  del mismo servidor (servicio, `src/presence.rs`); las entradas con más de
+  5 min se ignoran. En la fila (vistas lista y tarjeta) todo va **en una sola línea**:
   `EQUIPO  usuario@host  P1;P2;P5` (alias, equipo y sesiones en verde) más la
   nota si existe, con tooltip al pasar el mouse (`presenceSessionsOf` en
   `github_sync.dart`, render en `peer_card.dart`). La PC publica **todas** las
@@ -119,10 +128,22 @@ Verificar tamaños locales contra `gh release view v1.4.0-XX --json assets`.
   (alias `rustdesk`); sus 4 valores están como secrets del repo
   (`ANDROID_SIGNING_KEY`, `ANDROID_ALIAS`, `ANDROID_KEY_STORE_PASSWORD`,
   `ANDROID_KEY_PASSWORD`). **Si se pierde, los APK dejan de actualizar encima.**
-- Token de GitHub embebido (repo privado + `presence.rs`): con permiso de
-  escritura. **Si alguien se va en malos términos: revocar el token, poner uno
-  nuevo y sacar versión nueva.** No commitear nunca un token en claro (GitHub
-  bloquea el push por secret scanning).
+- `SYNC_TOKEN` (acceso al servidor de listas/presencia): **solo** como secret
+  del repo en GitHub Actions; en el código NO aparece. CI lo inyecta en el
+  build: en Rust vía la variable de entorno del workflow global
+  (`flutter-build.yml` → `option_env!("SYNC_TOKEN")` en `presence.rs`) y en
+  Dart sobreescribiendo `flutter/lib/common/widgets/sync_token.dart` en cada
+  job (el archivo commiteado tiene `''` = sync apagada). El mismo valor vive
+  en `C:\Users\VITALFIX\.rustdesk-secrets\token-vps-sync.txt` y en
+  `/opt/rustdesk-listas/token` en la VPS (se lee por petición: se puede
+  rotar editando ese archivo, sin reiniciar). **Si alguien se va en malos
+  términos: rotar el token en la VPS + cambiar el secret y sacar versión
+  nueva.** No commitear nunca un token en claro (GitHub bloquea el push por
+  secret scanning y revoca el token encontrado).
+- Certificado TLS de la VPS (pinning): `C:\Users\VITALFIX\.rustdesk-secrets\
+  vps-tls\` (cert.pem, key.pem, fingerprint). Válido 2026→2036 con
+  SAN=IP:147.15.111.14. **Si se regenera, hay que actualizar `_kSyncCertPin`
+  y `CERT_PEM` y sacar versión nueva.**
 - `flutter/pubspec.lock` lo reescribe el SDK local: revertirlo siempre antes
   de commitear (`git checkout -- flutter/pubspec.lock`).
 

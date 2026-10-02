@@ -316,7 +316,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
           trailing: const Icon(Icons.arrow_forward_ios),
           onPressed: (context) => showImportConfigBackupDialog(context)),
       SettingsTile(
-          title: const Text('Sincronizar con GitHub'),
+          title: const Text('Sincronizar listas'),
           trailing: const Icon(Icons.arrow_forward_ios),
           onPressed: (context) => showGitHubSyncDialog(context)),
     ];

@@ -2581,7 +2581,7 @@ class _AboutState extends State<_About> {
                       .marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () => showGitHubSyncDialog(context),
-                  child: const Text('Sincronizar con GitHub',
+                  child: const Text('Sincronizar listas',
                           style: linkStyle)
                       .marginSymmetric(vertical: 4.0)),
               InkWell(

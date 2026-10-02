@@ -57,6 +57,9 @@ env:
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
+  # Token del servidor propio de listas/presencia: lo lee presence.rs via
+  # option_env! en el build de Rust; el de Dart se escribe en otro step.
+  SYNC_TOKEN: "${{ secrets.SYNC_TOKEN }}"
 
 jobs:
   generate-sbom:
@@ -286,6 +289,10 @@ jobs:
         if: ${{ matrix.job.arch == 'aarch64' }}
         shell: bash
         run: echo "SODIUM_LIB_DIR=$VCPKG_ROOT/installed/${{ matrix.job.vcpkg-triplet }}/lib" >> "$GITHUB_ENV"
+
+      - name: Inyectar token de sync (Dart)
+        shell: bash
+        run: printf "const String kSyncToken = '%s';\n" "$SYNC_TOKEN" > flutter/lib/common/widgets/sync_token.dart
 
       - name: Build rustdesk
         run: |
@@ -914,6 +921,10 @@ jobs:
           cargo -V
           rustc -V
 
+      - name: Inyectar token de sync (Dart)
+        shell: bash
+        run: printf "const String kSyncToken = '%s';\n" "$SYNC_TOKEN" > flutter/lib/common/widgets/sync_token.dart
+
       - name: Build rustdesk
         run: |
           if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
@@ -1242,6 +1253,10 @@ jobs:
           name: librustdesk.so.${{ matrix.job.target }}
           path: ./target/${{ matrix.job.target }}/release/liblibrustdesk.so
 
+      - name: Inyectar token de sync (Dart)
+        shell: bash
+        run: printf "const String kSyncToken = '%s';\n" "$SYNC_TOKEN" > flutter/lib/common/widgets/sync_token.dart
+
       - name: Build rustdesk
         shell: bash
         env:
@@ -1451,6 +1466,10 @@ jobs:
         with:
           name: librustdesk.so.i686-linux-android
           path: ./flutter/android/app/src/main/jniLibs/x86
+
+      - name: Inyectar token de sync (Dart)
+        shell: bash
+        run: printf "const String kSyncToken = '%s';\n" "$SYNC_TOKEN" > flutter/lib/common/widgets/sync_token.dart
 
       - name: Build rustdesk
         shell: bash

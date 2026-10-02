@@ -12,18 +12,21 @@ import 'package:http/io_client.dart';
 import '../../common.dart';
 import '../../models/platform_model.dart';
 import 'pin_lock.dart';
+import 'sync_token.dart';
 
 const kGhSyncName = 'gh-sync-name';
 const kGhSyncAuto = 'gh-sync-auto';
 const kGhSyncHash = 'gh-sync-hash';
 
 const kGhSyncRepoFixed = 'vitalfix/rustdesk-listas';
-const _kGhSyncTokenA = 'github_pat_11ALOXYAQ0rSRZNGDhp8oQ_';
-const _kGhSyncTokenB = '8BTZ0EtuNIZoR3qH1wRxS0VX68CcVfrglv3tf51gUcMPRZWJR243OYYNQxE';
-const kGhSyncTokenFixed = '$_kGhSyncTokenA$_kGhSyncTokenB';
+// Servidor propio: HTTPS con certificado fijado (_kSyncCertPin = sha256 del
+// cert). El token lo inyecta CI en sync_token.dart; vacio = sync apagada.
+const _kSyncBase = 'https://147.15.111.14:21121';
+const _kSyncCertPin =
+    'c54851b62084df504f2bf6cbd61452958b49aead6663f34eddb69aaa638adefb';
 
 String ghSyncRepo() => kGhSyncRepoFixed;
-String ghSyncToken() => kGhSyncTokenFixed;
+String ghSyncToken() => kSyncToken;
 String ghSyncName() => bind.getLocalFlutterOption(k: kGhSyncName);
 bool ghSyncAuto() => bind.getLocalFlutterOption(k: kGhSyncAuto) == 'Y';
 bool ghSyncConfigured() => ghSyncName().isNotEmpty;
@@ -135,56 +138,36 @@ String? ghDecryptData(String data, String pin) {
   }
 }
 
-// --------------------------- API de GitHub ---------------------------
-
-bool _ghInsecure = false;
+// --------------------------- API del servidor de listas ---------------------------
 
 Map<String, String> _ghHeaders() => {
       'Authorization': 'Bearer ${ghSyncToken()}',
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'RustDesk',
     };
 
-Uri _ghUri() =>
-    Uri.parse('https://api.github.com/repos/${ghSyncRepo()}/contents/${ghSyncFilePath()}');
+Uri _ghUri() => Uri.parse(
+    '$_kSyncBase/repos/${ghSyncRepo()}/contents/${ghSyncFilePath()}');
 
 Future<http.Response> _ghRequest(String method, Uri uri,
     Map<String, String> headers, {String? body}) async {
   // Sin tiempo limite una llamada colgada frena el temporizador de sync.
   const t = Duration(seconds: 15);
-  Future<http.Response> attempt() async {
-    if (_ghInsecure) {
-      final client = IOClient(
-          HttpClient()..badCertificateCallback = (cert, host, port) => true);
-      try {
-        return method == 'GET'
-            ? await client.get(uri, headers: headers).timeout(t)
-            : await client.put(uri, headers: headers, body: body).timeout(t);
-      } finally {
-        client.close();
-      }
-    }
-    return method == 'GET'
-        ? await http.get(uri, headers: headers).timeout(t)
-        : await http.put(uri, headers: headers, body: body).timeout(t);
-  }
-
+  // Solo se acepta el certificado fijado del servidor propio; cualquier otro
+  // (mitm, cert regenerado) queda fuera con HandshakeException.
+  final client = IOClient(HttpClient()
+    ..badCertificateCallback = (cert, host, port) =>
+        sha256.convert(cert.der).toString() == _kSyncCertPin);
   try {
-    return await attempt();
+    return method == 'GET'
+        ? await client.get(uri, headers: headers).timeout(t)
+        : await client.put(uri, headers: headers, body: body).timeout(t);
   } on HandshakeException {
-    // El modo sin verificacion vale SOLO para este intento (antivirus/proxy
-    // mediante); el proximo intento vuelve a validar el certificado.
-    _ghInsecure = true;
-    try {
-      showToast(
-          'No se pudo verificar el certificado HTTPS (antivirus o proxy). Se conecta igual esta vez.');
-      return await attempt();
-    } finally {
-      _ghInsecure = false;
-    }
+    throw Exception(
+        'Certificado del servidor no reconocido (fijado incorrecto)');
   } on TimeoutException {
-    throw Exception('GitHub no responde (sin internet?)');
+    throw Exception('El servidor de listas no responde (sin internet?)');
+  } finally {
+    client.close();
   }
 }
 
@@ -194,7 +177,7 @@ Future<Map<String, dynamic>> _ghDownload() async {
     return {'exists': false};
   }
   if (resp.statusCode != 200) {
-    throw Exception('GitHub ${resp.statusCode}');
+    throw Exception('Servidor ${resp.statusCode}');
   }
   final j = jsonDecode(resp.body) as Map<String, dynamic>;
   final content =
@@ -203,7 +186,7 @@ Future<Map<String, dynamic>> _ghDownload() async {
 }
 
 Future<void> _ghUpload(String content) async {
-  // Si otra PC subio en el medio, el sha queda viejo y GitHub devuelve 422:
+  // Si otra PC subio en el medio, el sha queda viejo y el servidor devuelve 422:
   // se reintenta una vez con el sha fresco en vez de perder el cambio.
   for (var i = 0; i < 2; i++) {
     String? sha;
@@ -221,7 +204,7 @@ Future<void> _ghUpload(String content) async {
       return;
     }
     if (resp.statusCode != 422 || i == 1) {
-      throw Exception('GitHub ${resp.statusCode}');
+      throw Exception('Servidor ${resp.statusCode}');
     }
   }
 }
@@ -233,7 +216,7 @@ int _mtimeAt(Map<String, dynamic> mtimes, String key) {
   return v is num ? v.toInt() : 0;
 }
 
-/// Combina el respaldo local con el de GitHub: se suman los archivos y, si un
+/// Combina el respaldo local con el del servidor: se suman los archivos y, si un
 /// archivo esta en los dos, gana el mas nuevo. Los equipos son archivos
 /// separados dentro de peers/, asi que el criterio es por equipo.
 String? ghMerge(String local, String remote) {
@@ -296,9 +279,12 @@ String? _syncEncryptAuto(String plain) {
 }
 
 /// Un solo boton: crea el archivo si no existe y, si existe, baja la copia de
-/// GitHub, la combina con la local, sube el resultado y lo aplica (la app se
+/// servidor, la combina con la local, sube el resultado y lo aplica (la app se
 /// reinicia sola para aplicarlo). La copia viaja cifrada con el PIN de la app.
 Future<String?> ghLink({BuildContext? ctx}) async {
+  if (ghSyncToken().isEmpty) {
+    return 'Esta build no tiene token de sincronización';
+  }
   if (ghSyncName().isEmpty) {
     return 'Escribí un nombre (ej: GERMAN-RUSTDESK)';
   }
@@ -315,19 +301,19 @@ Future<String?> ghLink({BuildContext? ctx}) async {
     if (cur['exists'] != true) {
       await _ghUpload(pin.isEmpty ? local : ghEncryptData(local, pin));
       await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(local));
-      return 'Lista creada en el repositorio';
+      return 'Lista creada en el servidor';
     }
     final remote = cur['content'] as String;
     final rdec = remote.trimLeft().startsWith('ENC1:')
         ? (pin.isEmpty ? null : ghDecryptData(remote, pin))
         : remote;
     if (rdec == null) {
-      return 'La copia de GitHub está cifrada con otro PIN';
+      return 'La copia del servidor está cifrada con otro PIN';
     }
     final merged =
         rdec.trimLeft().startsWith('{') ? ghMerge(local, rdec) : local;
     if (merged == null) {
-      return 'La copia de GitHub no se pudo leer';
+      return 'La copia del servidor no se pudo leer';
     }
     await _ghUpload(pin.isEmpty ? merged : ghEncryptData(merged, pin));
     await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(merged));
@@ -369,7 +355,7 @@ void startGitHubSync() {
 
 // --------------------------- presencia ---------------------------
 // Cada PC publica sola su estado en presencia.json (cero config: usa el
-// repositorio y token embebidos). La fila de cada equipo muestra quien
+// servidor propio y el token embebidos). La fila de cada equipo muestra quien
 // esta trabajando sin conectarse. Entradas de mas de 5 minutos se ignoran.
 
 const _kPresenceFile = 'presencia.json';
@@ -389,9 +375,12 @@ String _cleanSessionName(String raw) {
 }
 
 Future<void> fetchPresence() async {
+  if (ghSyncToken().isEmpty) {
+    return;
+  }
   try {
     final uri = Uri.parse(
-        'https://api.github.com/repos/${ghSyncRepo()}/contents/$_kPresenceFile');
+        '$_kSyncBase/repos/${ghSyncRepo()}/contents/$_kPresenceFile');
     final resp = await _ghRequest('GET', uri, _ghHeaders());
     if (resp.statusCode != 200) {
       return;
@@ -433,7 +422,7 @@ List<String> presenceSessionsOf(String id) {
   return p.sessions;
 }
 
-/// Sube la union de la lista local y la de GitHub (sin reiniciar la app).
+/// Sube la union de la lista local y la del servidor (sin reiniciar la app).
 Future<void> _ghTick() async {
   if (!ghSyncAuto() || !ghSyncConfigured()) {
     return;
@@ -467,7 +456,7 @@ Future<void> _ghTick() async {
       }
       await _ghUpload(up);
       await bind.setLocalFlutterOption(k: kGhSyncHash, v: ghHash(local));
-      showToast('Lista subida a GitHub');
+      showToast('Lista subida al servidor');
       return;
     }
     final remote = cur['content'] as String;
@@ -544,7 +533,7 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) => AlertDialog(
-        title: const Text('Sincronizar con GitHub'),
+        title: const Text('Sincronizar listas'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -563,10 +552,10 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
                   onChanged: (v) => setState(() => auto = v),
                 ),
                 const Text(
-                  'El repositorio y el token ya vienen dentro de la app: solo poné tu nombre '
+                  'El servidor y el acceso ya vienen dentro de la app: solo poné tu nombre '
                   '(la lista se guarda como equipos-<nombre>.json). Vincular crea la lista la '
-                  'primera vez y después la combina con la de GitHub, cifrada con el PIN de '
-                  'la app (si tenés uno).',
+                  'primera vez y después la combina con la del servidor, cifrada con el PIN '
+                  'de la app (si tenés uno).',
                   style: TextStyle(fontSize: 12),
                 ),
               ],
@@ -592,7 +581,7 @@ Future<void> showGitHubSyncDialog(BuildContext context) async {
           TextButton(
             onPressed: () {
               ghUnlink();
-              showToast('Desvinculado: esta PC ya no sincroniza con GitHub');
+              showToast('Desvinculado: esta PC ya no sincroniza la lista');
             },
             child: const Text('Desvincular'),
           ),

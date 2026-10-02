@@ -3,17 +3,37 @@ use std::time::Duration;
 use hbb_common::{config::Config, log, ResultType};
 
 const REPO: &str = "vitalfix/rustdesk-listas";
-const TOKEN_A: &str = "github_pat_11ALOXYAQ0rSRZNGDhp8oQ_";
-const TOKEN_B: &str = "8BTZ0EtuNIZoR3qH1wRxS0VX68CcVfrglv3tf51gUcMPRZWJR243OYYNQxE";
+const BASE: &str = "https://147.15.111.14:21121";
 const FILE: &str = "presencia.json";
 const INTERVAL_SECS: u64 = 120;
+// Certificado autofirmado del servidor propio: es la raiz de confianza
+// exclusiva del cliente (si alguien presenta otro cert, el TLS falla).
+const CERT_PEM: &str = "-----BEGIN CERTIFICATE-----
+MIIDJjCCAg6gAwIBAgIUGu22U4stb0yano3NzyFRRCAverwwDQYJKoZIhvcNAQEL
+BQAwGjEYMBYGA1UEAwwPcnVzdGRlc2stbGlzdGFzMB4XDTI2MTAwMjAzNTUyNVoX
+DTM2MDkyOTAzNTUyNVowGjEYMBYGA1UEAwwPcnVzdGRlc2stbGlzdGFzMIIBIjAN
+BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4yZbUMGIRVkrM809RPb7SLuSkvQY
+7Q+mfqaAm1jSCXImSW3SKxr1clxS4egbMbaLR1MRVhExz65C5j1aiP1dzZWDR5Fv
+KzzvrOqmgzNtr+zp0yvLyhjJh2BW5NYbK3WxqWGOvh1BgEhpKyLqSeIB0U3T/SAM
+d8rwIADGeu0n+yT/Oca0zOeNSCw6hLqgScBJDcroFSHIcuttI8+S4ViMWwc7GYbO
+OXD2OPOUuSX4aiQg8qbigdBsAE0sjHEz/fjIdONQVDXw5ETxE0cDivjI7M9EO21z
+vh+K2TH6IFMtym4cuDhNaUNb+CB1EYZ1cVLqcHoI2blwJI6Z2s3gFXXz1QIDAQAB
+o2QwYjAdBgNVHQ4EFgQU0YopYUuPAMWdyFNmInQ803hxmQkwHwYDVR0jBBgwFoAU
+0YopYUuPAMWdyFNmInQ803hxmQkwDwYDVR0TAQH/BAUwAwEB/zAPBgNVHREECDAG
+hwSTD28OMA0GCSqGSIb3DQEBCwUAA4IBAQCNsiag5E8PhpKqs8mgdsD9xyq5q4cg
+FgY29+KKrb7kTwCTmRUirhrOA4x4aJEp6du5sSu9mI/H8Dx9yDB88/cLlNHGwEKm
+HY7bfjM1gAOFRYZrzqZFxViICrGgu2lIvCsnDQS8I7zdtPPq7qQkNrUC0JgGNW9X
+H8uqtxBXsGvbM4604ydN+brE05U0dflkUOK+d6u83Lcgb+nyLwL8B329kW6sxIN8
+JBaGb5uPQs1UYUY7jrTXe/qVKuf226zAai1rgISUZFgOLjNoJjQwz3GB+4QAPpeO
+RDskuOeGnzZuxBMmlmAAqRY77488yfHtQcED2uTA+JGION6ihdec0mNc
+-----END CERTIFICATE-----";
 
 fn api_url() -> String {
-    format!("https://api.github.com/repos/{REPO}/contents/{FILE}")
+    format!("{BASE}/repos/{REPO}/contents/{FILE}")
 }
 
 fn token() -> String {
-    [TOKEN_A, TOKEN_B].concat()
+    option_env!("SYNC_TOKEN").unwrap_or_default().to_string()
 }
 
 fn own_sessions() -> Vec<String> {
@@ -128,6 +148,8 @@ fn publish_once() -> ResultType<()> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
         .user_agent("RustDesk")
+        .use_rustls_tls()
+        .add_root_certificate(reqwest::Certificate::from_pem(CERT_PEM.as_bytes())?)
         .build()?;
     let id = Config::get_id();
     if id.is_empty() {
@@ -154,6 +176,11 @@ fn publish_once() -> ResultType<()> {
 }
 
 fn presence_loop() {
+    // Build local sin token: no hay servidor al que publicar.
+    if token().is_empty() {
+        log::info!("presence skipped: build without sync token");
+        return;
+    }
     // Publicar al arrancar: si no, la primera publicacion tardaria 2 minutos.
     if let Err(e) = publish_once() {
         log::warn!("presence publish failed: {e}");
