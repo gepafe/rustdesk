@@ -111,6 +111,14 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   (`RendezvousMediator::restart()`). Las sesiones activas no se cortan: solo
   cambia el registro. Si el usuario repunta la VPS a mano mientras está
   caída, se respeta.
+- **Configuración de la VPS embebida**: en la primera arrancada de cada PC,
+  `ensure_embedded()` (`src/failover.rs`, enganchado en `src/server.rs`) rellena
+  solo si `custom-rendezvous-server` está vacío y no hay failover activo:
+  `147.15.111.14`, relay `147.15.111.14:21117` y la clave de la VPS; después
+  marca la clave local `vps-embedded` y no vuelve a tocar nada (respeta datos
+  cargados a mano, datos borrados a propósito y el salvavidas). Así una PC nueva
+  conecta sin cargar ningún dato; la UI los muestra sincronizados desde el
+  servicio por IPC.
 - **Chequeo de conexión a la VPS**: la barra de estado inferior (desktop)
   consulta `/health` de la VPS con cert fijado (`syncServerStatus()` en
   `github_sync.dart`) y `rs-ny.rustdesk.com` cada 15 s; ya no usa GitHub.

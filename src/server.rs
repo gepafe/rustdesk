@@ -615,6 +615,8 @@ pub fn check_zombie() {
 #[cfg(any(target_os = "android", target_os = "ios"))]
 #[tokio::main]
 pub async fn start_server(_is_server: bool) {
+    #[cfg(target_os = "android")]
+    crate::failover::ensure_embedded();
     crate::RendezvousMediator::start_all().await;
 }
 
@@ -643,6 +645,7 @@ pub async fn start_server(is_server: bool, no_server: bool) {
 
     #[cfg(feature = "flutter")]
     crate::presence::spawn_presence_publisher();
+    crate::failover::ensure_embedded();
     crate::failover::spawn_failover_monitor();
 
     if is_server {

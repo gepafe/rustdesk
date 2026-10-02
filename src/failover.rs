@@ -22,6 +22,12 @@ const K_SAVED_CUSTOM: &str = "vps-failover-custom";
 const K_SAVED_RELAY: &str = "vps-failover-relay";
 const K_SAVED_KEY: &str = "vps-failover-key";
 
+// Datos de la VPS embebidos para que una PC nueva conecte sin carga manual.
+const EMBED_CUSTOM: &str = "147.15.111.14";
+const EMBED_RELAY: &str = "147.15.111.14:21117";
+const EMBED_KEY: &str = "ehPisWWzu71QSwcOHSyYDFyZPysdul8zk1hebPpDW68=";
+const K_EMBEDDED: &str = "vps-embedded";
+
 fn probe_ok() -> bool {
     PROBES.iter().all(|p| {
         p.parse::<SocketAddr>()
@@ -66,6 +72,25 @@ fn go_vps() {
     apply(&custom, &relay, &key);
     LocalConfig::set_option(K_ACTIVE.to_owned(), String::new());
     log::warn!("failover: la VPS volvio, se restaura el servidor propio");
+}
+
+// Se ejecuta una sola vez por equipo (primer arrancada). Solo rellena si no hay
+// servidor configurado y no hay failover activo: vacio + failover significa que
+// la VPS esta caida, no que falte configurar, y tras pedir datos a mano o
+// borrarlos a proposito nunca vuelve a tocar nada.
+pub fn ensure_embedded() {
+    if LocalConfig::get_option(K_EMBEDDED) == "Y" {
+        return;
+    }
+    if LocalConfig::get_option(K_ACTIVE) != "Y"
+        && Config::get_option("custom-rendezvous-server").is_empty()
+    {
+        Config::set_option("custom-rendezvous-server".to_owned(), EMBED_CUSTOM.to_owned());
+        Config::set_option("relay-server".to_owned(), EMBED_RELAY.to_owned());
+        Config::set_option("key".to_owned(), EMBED_KEY.to_owned());
+        log::info!("config: servidor VPS embebido en la primera arrancada");
+    }
+    LocalConfig::set_option(K_EMBEDDED.to_owned(), "Y".to_owned());
 }
 
 fn monitor_loop() {
