@@ -42,6 +42,7 @@ mod auth_2fa;
 #[cfg(feature = "flutter")]
 mod backup;
 #[cfg(feature = "flutter")]
+mod failover;
 mod presence;
 #[cfg(not(target_os = "ios"))]
 mod clipboard;

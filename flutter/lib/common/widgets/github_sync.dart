@@ -171,6 +171,26 @@ Future<http.Response> _ghRequest(String method, Uri uri,
   }
 }
 
+// Codigo HTTP de /health del servidor propio, con el certificado fijado.
+// null si no contesta. Lo usa el indicador de conexion de la barra de estado.
+Future<int?> syncServerStatus() async {
+  try {
+    final client = IOClient(HttpClient()
+      ..badCertificateCallback = (cert, host, port) =>
+          sha256.convert(cert.der).toString() == _kSyncCertPin);
+    try {
+      final resp = await client
+          .get(Uri.parse('$_kSyncBase/health'))
+          .timeout(const Duration(seconds: 4));
+      return resp.statusCode;
+    } finally {
+      client.close();
+    }
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<Map<String, dynamic>> _ghDownload() async {
   final resp = await _ghRequest('GET', _ghUri(), _ghHeaders());
   if (resp.statusCode == 404) {

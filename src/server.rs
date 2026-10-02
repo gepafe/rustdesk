@@ -643,6 +643,7 @@ pub async fn start_server(is_server: bool, no_server: bool) {
 
     #[cfg(feature = "flutter")]
     crate::presence::spawn_presence_publisher();
+    crate::failover::spawn_failover_monitor();
 
     if is_server {
         crate::common::set_server_running(true);

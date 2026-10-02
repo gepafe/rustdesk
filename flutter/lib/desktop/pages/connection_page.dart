@@ -17,6 +17,7 @@ import 'package:flutter_hbb/models/peer_model.dart';
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/autocomplete.dart';
+import '../../common/widgets/github_sync.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
@@ -37,7 +38,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   Timer? _updateTimer;
 
   // Estado de la red, chequeado cada 15 s:
-  //  _netOk = hay internet (al menos un host responde)
+  //  _netOk = hay internet (responde la VPS propia o rs-ny)
   //  _rsOk  = responde el servidor de RustDesk (rs-ny)
   final _netOk = true.obs;
   final _rsOk = true.obs;
@@ -51,8 +52,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     super.initState();
     _updateTimer = periodic_immediate(Duration(seconds: 1), () async {
       updateStatus();
-      // Cada 15 s se chequea si hay internet y si responde el servidor
-      // de RustDesk, para avisar en la barra de estado inferior.
+      // Cada 15 s se chequea la VPS propia y el servidor de RustDesk,
+      // para avisar en la barra de estado inferior.
       if (++_netTick >= 15) {
         _netTick = 0;
         _checkConnectivity();
@@ -73,14 +74,15 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   Future<void> _checkConnectivity() async {
     final results = await Future.wait([
-      _httpStatus('https://api.github.com/'),
+      // VPS propia (/health con cert fijado); null si no contesta.
+      syncServerStatus(),
       // Raíz + ws/id: el backend da 502/504 cuando el rendezvous esta caido.
       _httpStatus('https://rs-ny.rustdesk.com/ws/id'),
     ]);
-    final gh = results[0];
+    final vps = results[0];
     final rs = results[1];
     // Sin internet solo si NINGUN host contesta.
-    _netOk.value = gh != null || rs != null;
+    _netOk.value = vps != null || rs != null;
     _rsOk.value = rs != null && rs != 502 && rs != 504;
   }
 

@@ -101,6 +101,19 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
   desconectadas—, no solo las conectadas en ese momento: función nativa
   `get_logged_in_session_ids` (`src/platform/windows.cc`) + wrapper
   `get_logged_in_session_names` (`src/platform/windows.rs`).
+- **Failover automático a servidores públicos (salvavidas)**:
+  `src/failover.rs` (hilo iniciado en `src/server.rs`) sondea cada 30 s el
+  hbbs y el hbbr de la VPS (`147.15.111.14:21116` y `:21117`, TCP). Tras
+  ~90 s de caída seguida vacía `custom-rendezvous-server`, `relay-server` y
+  `key` (entra sola la lista pública builtin de RustDesk) y guarda los
+  valores de la VPS en claves locales `vps-failover-*`; tras ~60 s de
+  respuesta seguida los restaura y vuelve a registrar en la VPS
+  (`RendezvousMediator::restart()`). Las sesiones activas no se cortan: solo
+  cambia el registro. Si el usuario repunta la VPS a mano mientras está
+  caída, se respeta.
+- **Chequeo de conexión a la VPS**: la barra de estado inferior (desktop)
+  consulta `/health` de la VPS con cert fijado (`syncServerStatus()` en
+  `github_sync.dart`) y `rs-ny.rustdesk.com` cada 15 s; ya no usa GitHub.
 - **Monitoreo Telegram** por equipo + chequeo cada 10 s.
 - **Android**: APK firmado con clave fija (actualiza encima); `hasFragileUserData`
   para conservar datos al desinstalar.
