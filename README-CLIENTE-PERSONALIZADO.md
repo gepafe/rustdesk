@@ -122,7 +122,13 @@ Fork de RustDesk 1.5 adaptado para uso propio. Todo lo personalizado vive en
 - **Chequeo de conexión a la VPS**: la barra de estado inferior (desktop)
   consulta `/health` de la VPS con cert fijado (`syncServerStatus()` en
   `github_sync.dart`) y `rs-ny.rustdesk.com` cada 15 s; ya no usa GitHub.
-- **Monitoreo Telegram** por equipo + chequeo cada 10 s.
+- **Monitoreo Telegram en la VPS**: `servidor.py` consulta a hbbs cada 10 s el
+  estado de los equipos vigilados y avisa por Telegram cuando cambia (offline
+  recién tras 2 chequeos seguidos, "volvió" al 1.º), sin depender de ninguna
+  PC; la config vive en `telegram-config.json` y la UI la lee/edita con
+  `GET/PUT /telegram/config` y `POST /telegram/test` (mismo token y cert
+  fijado). El timer local se reemplazó por `initTelegramMonitor()`, que solo
+  precarga esa config.
 - **Android**: APK firmado con clave fija (actualiza encima); `hasFragileUserData`
   para conservar datos al desinstalar.
 - **macOS**: dmg con firma ad-hoc (sin cuenta Apple Developer: abrir con

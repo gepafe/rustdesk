@@ -191,6 +191,69 @@ Future<int?> syncServerStatus() async {
   }
 }
 
+// --------------------------- Monitoreo Telegram (control en la VPS) ---------------------------
+
+Future<http.Response> _tgRequest(String method, Uri uri, {String? body}) async {
+  const t = Duration(seconds: 8);
+  final client = IOClient(HttpClient()
+    ..badCertificateCallback = (cert, host, port) =>
+        sha256.convert(cert.der).toString() == _kSyncCertPin);
+  try {
+    final headers = {..._ghHeaders(), 'Content-Type': 'application/json'};
+    final http.Response resp;
+    if (method == 'GET') {
+      resp = await client.get(uri, headers: headers).timeout(t);
+    } else if (method == 'PUT') {
+      resp = await client.put(uri, headers: headers, body: body).timeout(t);
+    } else {
+      resp = await client.post(uri, headers: headers, body: body).timeout(t);
+    }
+    return resp;
+  } on HandshakeException {
+    throw Exception(
+        'Certificado del servidor no reconocido (fijado incorrecto)');
+  } on TimeoutException {
+    throw Exception('El servidor no responde (sin internet?)');
+  } finally {
+    client.close();
+  }
+}
+
+// Config del monitoreo Telegram {token, chat_id, watched:{id:label}},
+// que vive en la VPS. null si no se pudo consultar.
+Future<Map<String, dynamic>?> tgGetConfig() async {
+  try {
+    final resp =
+        await _tgRequest('GET', Uri.parse('$_kSyncBase/telegram/config'));
+    if (resp.statusCode != 200) return null;
+    final j = jsonDecode(resp.body);
+    return j is Map<String, dynamic> ? j : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<bool> tgPutConfig(Map<String, dynamic> cfg) async {
+  try {
+    final resp = await _tgRequest('PUT',
+        Uri.parse('$_kSyncBase/telegram/config'), body: jsonEncode(cfg));
+    return resp.statusCode == 200;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<bool> tgTest() async {
+  try {
+    final resp = await _tgRequest(
+        'POST', Uri.parse('$_kSyncBase/telegram/test'),
+        body: '{}');
+    return resp.statusCode == 200;
+  } catch (_) {
+    return false;
+  }
+}
+
 Future<Map<String, dynamic>> _ghDownload() async {
   final resp = await _ghRequest('GET', _ghUri(), _ghHeaders());
   if (resp.statusCode == 404) {

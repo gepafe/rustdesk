@@ -1,130 +1,79 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
-import 'package:http/http.dart' as http;
 
-const _kIdsKey = 'telegram-monitor-ids';
-const _kTokenKey = 'telegram-bot-token';
-const _kChatIdKey = 'telegram-chat-id';
-const _cbQueryOnlines = 'callback_query_onlines';
+import 'github_sync.dart';
 
-final Set<String> _monitored = {};
-final Map<String, bool> _lastOnline = {};
+// El monitoreo (consulta cada 10 s) y los avisos por Telegram los hace la
+// VPS; aca solo se consulta y edita la configuracion que vive alla, asi el
+// estado no depende de que esta PC tenga internet o este encendida.
+Map<String, String> _watched = {};
+String _token = '';
+String _chatId = '';
 bool _loaded = false;
 bool _started = false;
 
-bool isTelegramMonitored(String id) => _monitored.contains(id);
+bool isTelegramMonitored(String id) => _watched.containsKey(id);
 
-String _labelKey(String id) => 'telegram-monitor-label-$id';
-
-String _now() {
-  final d = DateTime.now();
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(d.day)}/${two(d.month)} ${two(d.hour)}:${two(d.minute)}';
+Future<bool> _loadMonitors() async {
+  if (_loaded) return true;
+  final cfg = await tgGetConfig();
+  if (cfg == null) return false;
+  _token = (cfg['token'] ?? '') as String;
+  _chatId = (cfg['chat_id'] ?? '') as String;
+  _watched = {};
+  final w = cfg['watched'];
+  if (w is Map) {
+    for (final e in w.entries) {
+      _watched['${e.key}'] = '${e.value}';
+    }
+  }
+  _loaded = true;
+  return true;
 }
 
-Future<void> _loadMonitors() async {
-  if (_loaded) return;
-  _loaded = true;
-  final v = await bind.mainGetLocalOption(key: _kIdsKey);
-  for (final e in v.split(',')) {
-    if (e.isNotEmpty) {
-      _monitored.add(e);
-    }
+Future<void> _save() async {
+  final ok = await tgPutConfig({
+    'token': _token,
+    'chat_id': _chatId,
+    'watched': _watched,
+  });
+  if (!ok) {
+    // la proxima lectura vuelve a traer lo que quedo guardado en el servidor
+    _loaded = false;
   }
 }
 
 Future<void> toggleTelegramMonitor(String id, bool on,
     {String label = ''}) async {
-  await _loadMonitors();
+  if (!await _loadMonitors()) return;
   if (on) {
-    _monitored.add(id);
-    if (label.isNotEmpty) {
-      await bind.mainSetLocalOption(key: _labelKey(id), value: label);
-    }
+    _watched[id] = label.isEmpty ? id : label;
   } else {
-    _monitored.remove(id);
-    _lastOnline.remove(id);
+    _watched.remove(id);
   }
-  await bind.mainSetLocalOption(key: _kIdsKey, value: _monitored.join(','));
+  await _save();
 }
 
-Future<String> _label(String id) async {
-  final l = await bind.mainGetLocalOption(key: _labelKey(id));
-  return l.isEmpty ? id : l;
-}
-
-Future<void> sendTelegramMessage(String text) async {
-  final token = await bind.mainGetLocalOption(key: _kTokenKey);
-  final chatId = await bind.mainGetLocalOption(key: _kChatIdKey);
-  if (token.isEmpty || chatId.isEmpty) return;
-  try {
-    await http.post(
-      Uri.parse('https://api.telegram.org/bot$token/sendMessage'),
-      body: {'chat_id': chatId, 'text': text},
-    );
-  } catch (e) {
-    debugPrint('telegram: $e');
-  }
-}
-
-Future<void> _notify(String id, bool online) async {
-  final label = await _label(id);
-  final t = _now();
-  await sendTelegramMessage(online
-      ? '🟢 $label ($id) volvió a estar online ($t)'
-      : '🔴 $label ($id) se desconectó ($t)');
-}
-
-void _onQueryOnlines(Map<String, dynamic> evt) {
-  if (_monitored.isEmpty) return;
-  final onlines = (evt['onlines'] ?? '').toString().split(',').toSet();
-  final offlines = (evt['offlines'] ?? '').toString().split(',').toSet();
-  for (final id in _monitored.toList()) {
-    bool? now;
-    if (onlines.contains(id)) {
-      now = true;
-    } else if (offlines.contains(id)) {
-      now = false;
-    } else {
-      continue;
-    }
-    final prev = _lastOnline[id];
-    if (prev != null && prev != now) {
-      _notify(id, now);
-    }
-    _lastOnline[id] = now;
-  }
-}
-
-void startTelegramMonitor() {
-  if (!isWindows || _started) return;
+void initTelegramMonitor() {
+  if (_started) return;
   _started = true;
   _loadMonitors();
-  platformFFI.registerEventHandler(_cbQueryOnlines, 'telegram_monitor',
-      (evt) async {
-    _onQueryOnlines(evt);
-  });
-    Timer.periodic(const Duration(seconds: 10), (_) {
-    if (_monitored.isEmpty) return;
-    bind.queryOnlines(ids: _monitored.toList());
-  });
 }
 
 void showTelegramConfigDialog() async {
-  final token = await bind.mainGetLocalOption(key: _kTokenKey);
-  final chatId = await bind.mainGetLocalOption(key: _kChatIdKey);
-  final tokenController = TextEditingController(text: token);
-  final chatController = TextEditingController(text: chatId);
+  await _loadMonitors();
+  final tokenController = TextEditingController(text: _token);
+  final chatController = TextEditingController(text: _chatId);
 
   gFFI.dialogManager.show((setState, close, context) {
+    Future<void> guardar() async {
+      _token = tokenController.text.trim();
+      _chatId = chatController.text.trim();
+      await _save();
+    }
+
     submit() async {
-      await bind.mainSetLocalOption(
-          key: _kTokenKey, value: tokenController.text.trim());
-      await bind.mainSetLocalOption(
-          key: _kChatIdKey, value: chatController.text.trim());
+      await guardar();
       showToast(translate('Successful'));
       close();
     }
@@ -140,6 +89,7 @@ void showTelegramConfigDialog() async {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
+                'La vigilancia y los avisos los hace el servidor, no esta PC. '
                 'Crea un bot con @BotFather, pega acá el token y tu chat ID. '
                 'Después tildá "Monitoreo Telegram" en los equipos que quieras vigilar.',
               ),
@@ -157,11 +107,11 @@ void showTelegramConfigDialog() async {
       ),
       actions: [
         dialogButton('Probar', isOutline: true, onPressed: () async {
-          await bind.mainSetLocalOption(
-              key: _kTokenKey, value: tokenController.text.trim());
-          await bind.mainSetLocalOption(
-              key: _kChatIdKey, value: chatController.text.trim());
-          await sendTelegramMessage('✅ Prueba de alertas de RustDesk');
+          await guardar();
+          final ok = await tgTest();
+          showToast(ok
+              ? 'Mensaje de prueba enviado'
+              : 'No se pudo enviar; revisá el guardado');
         }),
         dialogButton("Cancel", onPressed: close, isOutline: true),
         dialogButton("OK", onPressed: submit),

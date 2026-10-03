@@ -514,7 +514,7 @@ class _PeersViewState extends State<_PeersView>
       // Primer chequeo automatico al abrir la app.
         if (isLoadEvent) {
           probePeersInfoOnStart();
-          startTelegramMonitor();
+          initTelegramMonitor();
         }
     }
     _lastQueryPeers = {..._curPeers};
